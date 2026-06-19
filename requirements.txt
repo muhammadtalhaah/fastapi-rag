@@ -1,0 +1,11 @@
+beanie
+openai
+fastapi
+uvicorn
+requests
+voyageai
+langchain
+pymongo[srv]
+python-dotenv
+llama-index-core
+llama-index-readers-file
