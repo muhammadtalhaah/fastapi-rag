@@ -1,11 +1,15 @@
 beanie
+numpy
 openai
 fastapi
+certifi
 uvicorn
 requests
 voyageai
 langchain
 pymongo[srv]
 python-dotenv
+pydantic[email]
+python-multipart
 llama-index-core
 llama-index-readers-file

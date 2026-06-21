@@ -1,0 +1,73 @@
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Committed palette — slate-ink ground, paper-white ink, retrieval teal, archival brass.
+     Teal appears ONLY on retrieved/scored data; brass marks call-numbers and structure. */
+  --ground: 20 24 29; /* #14181D */
+  --surface: 27 32 39; /* #1B2027 */
+  --rule: 47 55 64; /* #2F3740 */
+  --ink: 230 228 221; /* #E6E4DD */
+  --muted: 138 146 156; /* #8A929C */
+  --retrieval: 79 209 197; /* #4FD1C5 */
+  --brass: 201 162 39; /* #C9A227 */
+  --danger: 224 122 95; /* #E07A5F */
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: rgb(var(--ground));
+  color: rgb(var(--ink));
+  font-family: "Inter", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  /* faint ledger grain so the dark ground reads as paper, not void */
+  background-image: radial-gradient(
+    rgb(var(--rule) / 0.18) 1px,
+    transparent 1px
+  );
+  background-size: 22px 22px;
+}
+
+::selection {
+  background: rgb(var(--retrieval) / 0.28);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--rule)) transparent;
+}
+*::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgb(var(--rule));
+  border-radius: 0;
+}
+
+:focus-visible {
+  outline: 2px solid rgb(var(--retrieval));
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
