@@ -1,10 +1,3 @@
-// Route keys — single source of truth for nav and router.
-export const ROUTES = {
-  CHAT: "/",
-  DOCUMENTS: "/documents",
-  UPLOAD: "/upload",
-};
-
 // Default number of source chunks to retrieve per query (backend allows 1–20).
 export const DEFAULT_TOP_K = 5;
 

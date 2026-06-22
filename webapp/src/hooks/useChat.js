@@ -1,12 +1,17 @@
-import { useCallback, useState } from "react";
-import { askStream } from "@/services/chatService";
+import { useCallback, useRef, useState } from "react";
+import { askStream, endSession } from "@/services/chatService";
 import { DEFAULT_TOP_K } from "@/config";
 
 let nextId = 1;
 const makeId = () => `m${nextId++}`;
 
-// Owns the conversation transcript. Each turn is independent (single-turn RAG).
-// The assistant message goes through these statuses:
+// Owns the conversation transcript for display. Conversational *context* is held
+// server-side, keyed by a session id the backend returns on the first turn — the
+// client only carries that id, never the full history. The id lives in component
+// state, so a page refresh (remount) starts a brand-new conversation; `newChat`
+// does the same on demand and evicts the old session server-side.
+//
+// Each assistant message goes through these statuses:
 //   "pending"    — waiting for first byte
 //   "streaming"  — tokens are arriving (text is built incrementally)
 //   "done"       — complete
@@ -14,6 +19,10 @@ const makeId = () => `m${nextId++}`;
 export function useChat() {
   const [messages, setMessages] = useState([]);
   const [isAsking, setIsAsking] = useState(false);
+  // The server-side conversation id. Held in a ref so `send` reads the latest
+  // value without re-creating the callback; mirrored to state is unnecessary
+  // since nothing renders it.
+  const sessionIdRef = useRef(null);
 
   const send = useCallback(async (question) => {
     const trimmed = question.trim();
@@ -34,7 +43,10 @@ export function useChat() {
         prev.map((m) => (m.id === pendingId ? { ...m, ...fields } : m))
       );
 
-    await askStream(trimmed, DEFAULT_TOP_K, {
+    await askStream(trimmed, DEFAULT_TOP_K, sessionIdRef.current, {
+      onSession: (sessionId) => {
+        sessionIdRef.current = sessionId;
+      },
       onStatus: (stage, message) => {
         patch({ status: "streaming", activity: message });
       },
@@ -63,15 +75,28 @@ export function useChat() {
   const retry = useCallback(
     (failedId) => {
       const index = messages.findIndex((m) => m.id === failedId);
-      const question = messages[index - 1]?.text;
+      const userTurn = messages[index - 1];
+      const question = userTurn?.text;
       if (!question) return;
+      // The backend only records a turn on success, so a failed turn left the
+      // session untouched — drop the failed exchange from the view and re-ask
+      // against the same session.
       setMessages((prev) =>
-        prev.filter((m) => m.id !== failedId && m.id !== messages[index - 1]?.id)
+        prev.filter((m) => m.id !== failedId && m.id !== userTurn.id),
       );
       send(question);
     },
     [messages, send],
   );
 
-  return { messages, isAsking, send, retry };
+  // Close the current conversation and start fresh. Evicts the server session
+  // and clears the transcript; the next `send` mints a new session.
+  const newChat = useCallback(() => {
+    endSession(sessionIdRef.current);
+    sessionIdRef.current = null;
+    setMessages([]);
+    setIsAsking(false);
+  }, []);
+
+  return { messages, isAsking, send, retry, newChat };
 }

@@ -1,17 +1,48 @@
 import { AlertTriangle } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Spinner, AppButton } from "@/components/shared";
 import SourcesLedger from "./SourcesLedger";
 
-// Maps internal stage keys to human-readable labels shown during streaming.
-const STAGE_LABELS = {
-  embedding: "Understanding your question…",
-  searching: "Searching documents…",
-  thinking: "Thinking…",
-  generating: "Generating answer…",
+// Tailwind prose-style component map for react-markdown.
+const mdComponents = {
+  p: ({ children }) => <p className="mb-3 last:mb-0 leading-relaxed text-ink">{children}</p>,
+  h1: ({ children }) => <h1 className="mb-2 mt-4 text-xl font-semibold text-ink">{children}</h1>,
+  h2: ({ children }) => <h2 className="mb-2 mt-4 text-lg font-semibold text-ink">{children}</h2>,
+  h3: ({ children }) => <h3 className="mb-1 mt-3 text-base font-semibold text-ink">{children}</h3>,
+  ul: ({ children }) => <ul className="mb-3 ml-5 list-disc space-y-1 text-ink">{children}</ul>,
+  ol: ({ children }) => <ol className="mb-3 ml-5 list-decimal space-y-1 text-ink">{children}</ol>,
+  li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+  strong: ({ children }) => <strong className="font-semibold text-ink">{children}</strong>,
+  em: ({ children }) => <em className="italic">{children}</em>,
+  code: ({ inline, children }) =>
+    inline ? (
+      <code className="rounded bg-surface px-1 py-0.5 font-mono text-sm text-brass">{children}</code>
+    ) : (
+      <pre className="mb-3 overflow-x-auto rounded border border-rule bg-surface p-3">
+        <code className="font-mono text-sm text-ink">{children}</code>
+      </pre>
+    ),
+  blockquote: ({ children }) => (
+    <blockquote className="mb-3 border-l-2 border-brass pl-3 italic text-ink/70">{children}</blockquote>
+  ),
+  hr: () => <hr className="my-3 border-rule" />,
+  a: ({ href, children }) => (
+    <a href={href} className="text-brass underline underline-offset-2" target="_blank" rel="noreferrer">
+      {children}
+    </a>
+  ),
+  table: ({ children }) => (
+    <div className="mb-3 overflow-x-auto">
+      <table className="w-full border-collapse text-sm">{children}</table>
+    </div>
+  ),
+  th: ({ children }) => (
+    <th className="border border-rule bg-surface px-3 py-1.5 text-left font-semibold text-ink">{children}</th>
+  ),
+  td: ({ children }) => <td className="border border-rule px-3 py-1.5 text-ink">{children}</td>,
 };
 
-// Renders one message. User questions are right-aligned chips; assistant
-// answers are full-width with their sources ledger attached beneath.
 const MessageTurn = ({ message, onRetry }) => {
   if (message.role === "user") {
     return (
@@ -30,26 +61,24 @@ const MessageTurn = ({ message, onRetry }) => {
   return (
     <div className="flex flex-col">
       <div className="flex items-baseline gap-2">
-        <span className="font-mono text-xs uppercase tracking-[0.2em] text-brass">
-          Answer
-        </span>
+        <span className="font-mono text-xs uppercase tracking-[0.2em] text-brass">Answer</span>
       </div>
 
-      {/* Activity indicator — shown during pending and between status events */}
       {isLive && activityLabel ? (
         <div className="mt-2">
           <Spinner label={activityLabel} />
         </div>
       ) : null}
 
-      {/* Live text — appears as tokens stream in, stays for final done state */}
       {(message.status === "streaming" || message.status === "done") && message.text ? (
-        <p className="mt-2 whitespace-pre-wrap text-[0.95rem] leading-relaxed text-ink">
-          {message.text}
+        <div className="mt-2 text-[0.95rem]">
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+            {message.text}
+          </ReactMarkdown>
           {message.status === "streaming" ? (
             <span className="ml-0.5 inline-block h-[1em] w-[2px] animate-pulse bg-brass align-middle" />
           ) : null}
-        </p>
+        </div>
       ) : null}
 
       {message.status === "error" ? (
@@ -64,9 +93,7 @@ const MessageTurn = ({ message, onRetry }) => {
         </div>
       ) : null}
 
-      {/* Sources appear once retrieved, visible during generation and after */}
-      {(message.status === "streaming" || message.status === "done") &&
-      message.sources?.length > 0 ? (
+      {(message.status === "streaming" || message.status === "done") && message.sources?.length > 0 ? (
         <SourcesLedger sources={message.sources} />
       ) : null}
     </div>

@@ -1,5 +1,14 @@
 import { ENDPOINTS } from "@/api/endpoints";
 
+// Best-effort: tell the backend to drop a conversation (e.g. on "New chat").
+// Fire-and-forget — a failed eviction just means the session lingers until the
+// server restarts, which is harmless for ephemeral unauth sessions.
+export function endSession(sessionId) {
+  if (!sessionId) return;
+  const base = import.meta.env.VITE_API_BASE_URL || "";
+  fetch(`${base}${ENDPOINTS.querySession(sessionId)}`, { method: "DELETE" }).catch(() => {});
+}
+
 function toSource(raw, index) {
   return {
     key: `${raw.document_id}-${raw.chunk_index}-${index}`,
@@ -18,83 +27,77 @@ function deriveCallNumber(filename, chunkIndex) {
   return `${code}·${String(chunkIndex).padStart(3, "0")}`;
 }
 
-// Parse raw SSE buffer into complete frames, returning { frames, remainder }.
-function parseSSEBuffer(buffer) {
-  const frames = [];
-  const parts = buffer.split("\n\n");
-  const remainder = parts.pop(); // last part may be incomplete
-  for (const part of parts) {
-    const eventMatch = part.match(/event: (.+)/);
-    const dataMatch = part.match(/data: (.+)/);
-    if (eventMatch && dataMatch) {
-      try {
-        frames.push({ event: eventMatch[1].trim(), data: JSON.parse(dataMatch[1]) });
-      } catch {
-        // malformed JSON — skip
-      }
-    }
+function buildWsUrl(path) {
+  const base = import.meta.env.VITE_API_BASE_URL || "";
+  // If base is an absolute http(s) URL, swap scheme to ws(s).
+  if (base.startsWith("http")) {
+    return base.replace(/^http/, "ws") + path;
   }
-  return { frames, remainder };
+  // Relative base (dev proxy) — use current host.
+  const proto = window.location.protocol === "https:" ? "wss" : "ws";
+  return `${proto}://${window.location.host}${base}${path}`;
 }
 
-// Stream a question to the backend SSE endpoint.
+// Stream a question to the backend WebSocket endpoint.
+// `sessionId` ties this turn to a server-side conversation so the bot answers
+// follow-ups in context. Pass null to start a fresh conversation — the backend
+// mints an id and returns it via the onSession callback.
 // Callbacks:
-//   onStatus(stage, message)  — activity indicator ("embedding" | "searching" | "generating")
-//   onSources(sources)        — source chunks available before generation starts
-//   onToken(text)             — incremental answer text
+//   onSession(sessionId)      — server's session id (capture for next turn)
+//   onStatus(stage, message)  — activity indicator
+//   onSources(sources)        — source chunks before generation
+//   onToken(text)             — incremental answer token
 //   onDone()                  — stream complete
 //   onError(message)          — server or network error
-export async function askStream(question, topK, { onStatus, onSources, onToken, onDone, onError }) {
-  const baseURL = import.meta.env.VITE_API_BASE_URL || "";
+export function askStream(question, topK, sessionId, { onSession, onStatus, onSources, onToken, onDone, onError }) {
+  return new Promise((resolve) => {
+    let ws;
+    let finished = false;
 
-  let response;
-  try {
-    response = await fetch(`${baseURL}${ENDPOINTS.QUERY}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question, top_k: topK }),
-    });
-  } catch (err) {
-    onError?.(err.message || "Network error — check that the backend is running.");
-    return;
-  }
+    const finish = (fn) => {
+      if (finished) return;
+      finished = true;
+      fn?.();
+      resolve();
+    };
 
-  if (!response.ok) {
-    let detail = `Server error ${response.status}`;
     try {
-      const body = await response.json();
-      if (typeof body.detail === "string") detail = body.detail;
-    } catch { /* ignore */ }
-    onError?.(detail);
-    return;
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  while (true) {
-    let chunk;
-    try {
-      chunk = await reader.read();
-    } catch {
-      onError?.("Connection lost while streaming.");
+      ws = new WebSocket(buildWsUrl(ENDPOINTS.QUERY_WS));
+    } catch (err) {
+      finish(() => onError?.(err.message || "Failed to open WebSocket connection."));
       return;
     }
 
-    const { value, done } = chunk;
-    if (done) break;
+    ws.onopen = () => {
+      ws.send(JSON.stringify({ question, top_k: topK, session_id: sessionId || null }));
+    };
 
-    buffer += decoder.decode(value, { stream: true });
-    const { frames, remainder } = parseSSEBuffer(buffer);
-    buffer = remainder;
-
-    for (const { event, data } of frames) {
-      if (event === "status") onStatus?.(data.stage, data.message);
+    ws.onmessage = (evt) => {
+      let msg;
+      try {
+        msg = JSON.parse(evt.data);
+      } catch {
+        return;
+      }
+      const { event, data } = msg;
+      if (event === "session") onSession?.(data.session_id);
+      else if (event === "status") onStatus?.(data.stage, data.message);
       else if (event === "sources") onSources?.((data.sources || []).map(toSource));
       else if (event === "token") onToken?.(data.text);
-      else if (event === "done") onDone?.();
-      else if (event === "error") onError?.(data.message || "Unknown error from server.");
-    }
-  }
+      else if (event === "done") { finish(() => { onDone?.(); ws.close(); }); }
+      else if (event === "error") { finish(() => { onError?.(data.message || "Unknown error."); ws.close(); }); }
+    };
+
+    ws.onerror = () => {
+      finish(() => onError?.("WebSocket connection error — check that the backend is running."));
+    };
+
+    ws.onclose = (evt) => {
+      if (!evt.wasClean) {
+        finish(() => onError?.("Connection closed unexpectedly."));
+      } else {
+        finish(null);
+      }
+    };
+  });
 }

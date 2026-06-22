@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import { PageHeader, AppButton } from "@/components/shared";
 import { ROUTES } from "@/config";
-import { useUpload } from "./useUpload";
+import { useUpload } from "@/hooks";
 import DropZone from "./DropZone";
 import UploadProgress from "./UploadProgress";
 

@@ -13,6 +13,7 @@ const uploadDocument = (file, onProgress) => {
   form.append("file", file);
 
   return apiClient.post(ENDPOINTS.INGEST, form, {
+    headers: { "Content-Type": undefined },
     onUploadProgress: (event) => {
       if (onProgress && event.total) {
         onProgress(Math.round((event.loaded / event.total) * 100));

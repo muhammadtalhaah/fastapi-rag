@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { documentService } from "@/services";
 import { ACCEPTED_EXTENSIONS } from "@/config";
-import { DOCUMENTS_KEY } from "@/pages/documents/useDocuments";
+import { DOCUMENTS_KEY } from "@/hooks/useDocuments";
 
 const hasAcceptedExtension = (name) =>
   ACCEPTED_EXTENSIONS.some((ext) => name.toLowerCase().endsWith(ext));

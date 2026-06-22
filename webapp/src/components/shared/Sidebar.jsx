@@ -1,6 +1,6 @@
 import { NavLink } from "react-router-dom";
+import { ROUTES } from "../../config/routes";
 import { MessagesSquare, Library, UploadCloud } from "lucide-react";
-import { ROUTES } from "@/config";
 
 // Nav reads like a card-catalog index: each entry has a brass call-number, an
 // icon, and a label. Order encodes the natural workflow — ask, browse, add.

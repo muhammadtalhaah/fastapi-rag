@@ -4,6 +4,8 @@ const BASE = "/api/v1";
 
 export const ENDPOINTS = {
   QUERY: `${BASE}/query/stream`,
+  QUERY_WS: `${BASE}/query/ws`,
+  querySession: (id) => `${BASE}/query/session/${id}`,
   INGEST: `${BASE}/ingest/`,
   ingestItem: (id) => `${BASE}/ingest/${id}`,
   documentDownload: (id) => `${BASE}/ingest/${id}/download`,

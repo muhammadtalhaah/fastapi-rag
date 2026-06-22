@@ -11,3 +11,6 @@ VOYAGE_API_KEY = os.getenv("VOYAGE_API_KEY")
 AZURE_API_KEY = os.getenv("AZURE_OPENAI_API_KEY")
 AZURE_BASE_URL = os.getenv("AZURE_OPENAI_BASE_URL")
 MONGODB_CONNECTION_STRING = os.getenv("MONGODB_CONNECTION_STRING")
+
+DEBUG = os.getenv("DEBUG", "false").lower() == "true"
+LOG_LEVEL = os.getenv("LOG_LEVEL", "info")

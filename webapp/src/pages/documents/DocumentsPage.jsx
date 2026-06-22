@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Library, RotateCw, Plus } from "lucide-react";
 import { PageHeader, StateBlock, AppButton } from "@/components/shared";
 import { ROUTES } from "@/config";
-import { useDocuments } from "./useDocuments";
+import { useDocuments } from "@/hooks";
 import DocumentRow from "./DocumentRow";
 import ConfirmDelete from "./ConfirmDelete";
 
@@ -76,7 +76,7 @@ const DocumentsPage = () => {
                 <Th className="hidden sm_tablet:table-cell">Added</Th>
                 <Th className="hidden lg_tablet:table-cell">Size</Th>
                 <Th>Index</Th>
-                <Th className="text-right">Remove</Th>
+                <Th className="text-right">Actions</Th>
               </tr>
             </thead>
             <tbody>

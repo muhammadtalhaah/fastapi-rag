@@ -1,11 +1,11 @@
-import { useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
-import { MessagesSquare } from "lucide-react";
-import { StateBlock } from "@/components/shared";
-import { ROUTES } from "@/config";
-import { useChat } from "./useChat";
-import MessageTurn from "./MessageTurn";
+import { useChat } from "@/hooks";
 import Composer from "./Composer";
+import MessageTurn from "./MessageTurn";
+import { Link } from "react-router-dom";
+import { useEffect, useRef } from "react";
+import { ROUTES } from "../../config/routes";
+import { MessagesSquare, PenSquare } from "lucide-react";
+import { StateBlock } from "@/components/shared";
 
 const SUGGESTIONS = [
   "What are the key findings?",
@@ -14,7 +14,7 @@ const SUGGESTIONS = [
 ];
 
 const ChatPage = () => {
-  const { messages, isAsking, send, retry } = useChat();
+  const { messages, isAsking, send, retry, newChat } = useChat();
   const endRef = useRef(null);
 
   // Keep the newest turn in view as the transcript grows.
@@ -25,21 +25,40 @@ const ChatPage = () => {
   const isEmpty = messages.length === 0;
 
   return (
-    <div className="flex h-full flex-col gap-6">
-      <header className="border-b border-rule pb-5">
-        <span className="font-mono text-xs uppercase tracking-[0.25em] text-brass">
-          01 · Ask
-        </span>
-        <h1 className="mt-2 font-display text-3xl font-semibold leading-none tracking-tight text-ink sm_desktop:text-4xl">
-          Ask the archive
-        </h1>
+    <div className="flex h-screen flex-col max-h-screen overflow-hidden justify-between">
+      <header className="flex-1 border-b border-rule flex-grow-0 pb-4">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <span className="font-mono text-xs uppercase tracking-[0.25em] text-brass">
+              01 · Ask
+            </span>
+            <h1 className="mt-2 font-display text-3xl font-semibold leading-none tracking-tight text-ink sm_desktop:text-4xl">
+              Ask the archive
+            </h1>
+          </div>
+          {!isEmpty && (
+            <button
+              type="button"
+              onClick={newChat}
+              disabled={isAsking}
+              className="flex items-center gap-1.5 border border-rule px-3 py-1.5 text-xs text-muted transition-colors hover:border-brass hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <PenSquare size={14} />
+              New chat
+            </button>
+          )}
+        </div>
         <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">
-          Every answer is drawn from your uploaded documents and shows the exact
-          passages it came from.
+          Every answer is drawn from your uploaded documents and shows the exact passages
+          it came from.
         </p>
       </header>
 
-      <div className="flex flex-1 flex-col gap-6 overflow-y-auto pr-1">
+      <div
+        className={`flex flex-1 flex-col gap-6 overflow-y-auto flex-grow-1
+        ${isEmpty ? "justify-center" : "justify-start  pt-20"}
+        `}
+      >
         {isEmpty ? (
           <StateBlock
             variant="empty"
@@ -69,7 +88,7 @@ const ChatPage = () => {
         <div ref={endRef} />
       </div>
 
-      <div className="flex flex-col gap-2">
+      <div className="flex-1 flex flex-col gap-2 flex-grow-0 pb-2">
         <Composer onSubmit={send} disabled={isAsking} />
         <p className="text-center text-xs text-muted">
           No documents yet?{" "}

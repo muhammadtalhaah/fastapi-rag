@@ -1,9 +1,9 @@
 /* eslint-disable react-refresh/only-export-components -- router config file, not a component module */
 import { lazy, Suspense } from "react";
-import { createBrowserRouter, Navigate } from "react-router-dom";
-import DashboardLayout from "@/layouts/DashboardLayout";
+import { ROUTES } from "./config/routes";
 import { StateBlock } from "@/components/shared";
-import { ROUTES } from "@/config";
+import DashboardLayout from "@/layouts/DashboardLayout";
+import { createBrowserRouter, Navigate } from "react-router-dom";
 
 // Route-level code splitting: each page is its own chunk.
 const ChatPage = lazy(() => import("@/pages/chat"));
@@ -18,13 +18,13 @@ const withSuspense = (Page) => (
 
 export const router = createBrowserRouter([
   {
-    path: "/",
+    path: ROUTES.CHAT,
     element: <DashboardLayout />,
     children: [
       { index: true, element: withSuspense(ChatPage) },
-      { path: "documents", element: withSuspense(DocumentsPage) },
-      { path: "upload", element: withSuspense(UploadPage) },
-      { path: "*", element: <Navigate to={ROUTES.CHAT} replace /> },
+      { path: ROUTES.UPLOAD, element: withSuspense(UploadPage) },
+      { path: ROUTES.DOCUMENTS, element: withSuspense(DocumentsPage) },
+      { path: ROUTES.GLOBAL, element: <Navigate to={ROUTES.CHAT} replace /> },
     ],
   },
 ]);

@@ -1,0 +1,36 @@
+[project]
+name = "fastapi-rag"
+version = "0.1.0"
+description = "Retrieval-Augmented Generation API built with FastAPI"
+requires-python = ">=3.11"
+dependencies = [
+    "beanie",
+    "numpy",
+    "openai",
+    "fastapi",
+    "certifi",
+    "uvicorn[standard]",
+    "requests",
+    "voyageai",
+    "langchain",
+    "pymongo[srv]",
+    "python-dotenv",
+    "pydantic[email]",
+    "python-multipart",
+    "llama-index-core",
+    "llama-index-readers-file",
+    "tiktoken",
+]
+
+[project.scripts]
+serve = "app.main:main"
+
+[tool.uv]
+package = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
