@@ -7,6 +7,33 @@ const apiClient = create({
   baseURL: import.meta.env.VITE_API_BASE_URL || "",
   timeout: 60000, // RAG queries can take a while (embedding + LLM round-trip)
   headers: { Accept: "application/json" },
+  // Auth is session-cookie based (HttpOnly session id + a readable CSRF cookie).
+  // withCredentials makes the browser send/receive those cookies, including
+  // cross-origin (the backend sets allow_credentials=True in CORS).
+  withCredentials: true,
+});
+
+// The backend sets a readable (non-HttpOnly) CSRF cookie on login and validates
+// it against the session for state-changing requests (synchronizer-token
+// pattern). We echo it back in a header on those requests.
+const CSRF_COOKIE_NAME = "csrf_token";
+const CSRF_HEADER_NAME = "X-CSRF-Token";
+const STATE_CHANGING = new Set(["post", "put", "patch", "delete"]);
+
+function readCsrfToken() {
+  const match = document.cookie.match(
+    new RegExp(`(?:^|; )${CSRF_COOKIE_NAME}=([^;]*)`),
+  );
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+// Attach the CSRF header on state-changing requests only — safe methods are
+// exempt server-side, and there's no token to send before the user logs in.
+apiClient.addRequestTransform((request) => {
+  if (STATE_CHANGING.has((request.method || "").toLowerCase())) {
+    const token = readCsrfToken();
+    if (token) request.headers[CSRF_HEADER_NAME] = token;
+  }
 });
 
 // Readable fallbacks for APISauce problem codes, which are machine strings

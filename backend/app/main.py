@@ -3,8 +3,10 @@ import logging
 from db import lifespan
 from fastapi import FastAPI
 from api.v1 import router as v1_router
+from config import settings
 from config.api_keys import DEBUG, LOG_LEVEL
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 
 logging.basicConfig(
     level=logging.INFO,
@@ -12,6 +14,17 @@ logging.basicConfig(
 )
 
 app = FastAPI(lifespan=lifespan)
+
+# SessionMiddleware holds the short-lived OAuth `state`/nonce during the Google
+# redirect round-trip (Authlib stores it here). This is unrelated to our app's
+# server-side session store — it only secures the OAuth handshake. Cookie flags
+# match the auth cookies so it behaves consistently in dev vs prod.
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.oauth_state_secret,
+    same_site=settings.cookie_samesite,
+    https_only=settings.cookie_secure,
+)
 
 app.add_middleware(
     CORSMiddleware,

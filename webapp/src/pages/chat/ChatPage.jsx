@@ -2,10 +2,12 @@ import { useChat } from "@/hooks";
 import Composer from "./Composer";
 import MessageTurn from "./MessageTurn";
 import { Link } from "react-router-dom";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ROUTES } from "../../config/routes";
 import { MessagesSquare, PenSquare } from "lucide-react";
 import { StateBlock } from "@/components/shared";
+import { LoginModal, LoginPrompt } from "@/components/auth";
+import { useAuth } from "@/context";
 
 const SUGGESTIONS = [
   "What are the key findings?",
@@ -15,7 +17,13 @@ const SUGGESTIONS = [
 
 const ChatPage = () => {
   const { messages, isAsking, send, retry, newChat } = useChat();
+  const { isAuthenticated, isLoading: isAuthLoading, oauthError } = useAuth();
   const endRef = useRef(null);
+
+  // Login dialog visibility, and whether the guest prompt was dismissed for
+  // this session. Chatting is never blocked — the prompt is a soft nudge.
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [promptDismissed, setPromptDismissed] = useState(false);
 
   // Keep the newest turn in view as the transcript grows.
   useEffect(() => {
@@ -23,6 +31,14 @@ const ChatPage = () => {
   }, [messages]);
 
   const isEmpty = messages.length === 0;
+  // Show the modal when the user opened it, or when we returned from a failed
+  // Google sign-in (derived, so the error surfaces without an effect-driven
+  // setState). Closing clears the explicit-open flag; the OAuth error is
+  // cleared by the modal on unmount.
+  const showLoginModal = loginOpen || Boolean(oauthError);
+  // Show the guest prompt only once we know the user is logged out, and only
+  // until they dismiss it (or sign in).
+  const showLoginPrompt = !isAuthLoading && !isAuthenticated && !promptDismissed;
 
   return (
     <div className="flex h-screen flex-col max-h-screen overflow-hidden justify-between">
@@ -89,6 +105,12 @@ const ChatPage = () => {
       </div>
 
       <div className="flex-1 flex flex-col gap-2 flex-grow-0 pb-2">
+        {showLoginPrompt ? (
+          <LoginPrompt
+            onLogin={() => setLoginOpen(true)}
+            onDismiss={() => setPromptDismissed(true)}
+          />
+        ) : null}
         <Composer onSubmit={send} disabled={isAsking} />
         <p className="text-center text-xs text-muted">
           No documents yet?{" "}
@@ -101,6 +123,8 @@ const ChatPage = () => {
           to begin.
         </p>
       </div>
+
+      {showLoginModal ? <LoginModal onClose={() => setLoginOpen(false)} /> : null}
     </div>
   );
 };

@@ -3,6 +3,10 @@
 const BASE = "/api/v1";
 
 export const ENDPOINTS = {
+  AUTH_LOGIN: `${BASE}/auth/login`,
+  AUTH_LOGOUT: `${BASE}/auth/logout`,
+  AUTH_ME: `${BASE}/auth/me`,
+  AUTH_GOOGLE_LOGIN: `${BASE}/auth/google/login`,
   QUERY: `${BASE}/query/stream`,
   QUERY_WS: `${BASE}/query/ws`,
   querySession: (id) => `${BASE}/query/session/${id}`,
