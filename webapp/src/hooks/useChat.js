@@ -26,11 +26,15 @@ const makeId = () => `m${nextId++}`;
 export function useChat({ onTurnComplete, onConversationStart, onConversationTitle } = {}) {
   const [messages, setMessages] = useState([]);
   const [isAsking, setIsAsking] = useState(false);
+  const [isLoadingConversation, setIsLoadingConversation] = useState(false);
   const [connectionState, setConnectionState] = useState("idle");
   const [connectionMessage, setConnectionMessage] = useState("");
   const [activeConversationId, setActiveConversationId] = useState(null);
   const sessionIdRef = useRef(null);
   const conversationIdRef = useRef(null);
+  // Tracks the in-flight conversation-load request so switching conversations
+  // quickly can abort the stale fetch.
+  const loadAbortRef = useRef(null);
 
   const send = useCallback(async (question) => {
     const trimmed = question.trim();
@@ -133,6 +137,10 @@ export function useChat({ onTurnComplete, onConversationStart, onConversationTit
   // session and clears the transcript; the next `send` mints a new conversation.
   // Note: the durable history thread is NOT deleted — it stays in the sidebar.
   const newChat = useCallback(() => {
+    // Cancel any conversation still loading so its result doesn't land on the
+    // fresh chat.
+    loadAbortRef.current?.abort();
+    loadAbortRef.current = null;
     endSession(sessionIdRef.current);
     sessionIdRef.current = null;
     conversationIdRef.current = null;
@@ -149,8 +157,16 @@ export function useChat({ onTurnComplete, onConversationStart, onConversationTit
   // to the same DB thread.
   const loadConversation = useCallback(async (conversationId) => {
     if (!conversationId || isAsking) return;
+    // Abort a prior in-flight load — switching conversations quickly must not
+    // let an earlier (slower) response overwrite the one the user now wants.
+    loadAbortRef.current?.abort();
+    const controller = new AbortController();
+    loadAbortRef.current = controller;
+    setIsLoadingConversation(true);
     try {
-      const convo = await getConversation(conversationId);
+      const convo = await getConversation(conversationId, {
+        signal: controller.signal,
+      });
       sessionIdRef.current = null;
       conversationIdRef.current = convo.id;
       setActiveConversationId(convo.id);
@@ -159,6 +175,9 @@ export function useChat({ onTurnComplete, onConversationStart, onConversationTit
       setConnectionState("idle");
       setConnectionMessage("");
     } catch {
+      // An aborted load was superseded by a newer one — leave the UI to that
+      // request and don't surface an error.
+      if (controller.signal.aborted) return;
       // Surface a minimal error turn rather than failing silently.
       setMessages([
         {
@@ -172,12 +191,20 @@ export function useChat({ onTurnComplete, onConversationStart, onConversationTit
       ]);
       setConnectionState("error");
       setConnectionMessage("Couldn't load that conversation.");
+    } finally {
+      // Only the current request clears the loading flag; a superseded one must
+      // leave it set for the request that replaced it.
+      if (loadAbortRef.current === controller) {
+        loadAbortRef.current = null;
+        setIsLoadingConversation(false);
+      }
     }
   }, [isAsking]);
 
   return {
     messages,
     isAsking,
+    isLoadingConversation,
     connectionState,
     connectionMessage,
     activeConversationId,

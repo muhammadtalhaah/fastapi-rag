@@ -1,20 +1,19 @@
-import { useEffect, useRef, useState } from "react";
-import { NavLink, useSearchParams } from "react-router-dom";
-import { ROUTES } from "../../config/routes";
+import { useEffect, useState } from "react";
+import { NavLink, useLocation } from "react-router-dom";
 import {
-  Ellipsis,
   Library,
   LogIn,
   LogOut,
   MessagesSquare,
-  Pencil,
-  Trash2,
+  PanelLeftClose,
+  PanelLeftOpen,
   UploadCloud,
+  X,
 } from "lucide-react";
-import { useAuth } from "@/context";
-import { useConversations } from "@/hooks";
+import { ROUTES } from "@/config/routes";
+import { useAuth, useLayout } from "@/context";
 import { LoginModal } from "@/components/auth";
-import { TypewriterText } from "@/components/shared";
+import SidebarRecents from "./SidebarRecents";
 
 // Nav reads like a card-catalog index: each entry has a brass call-number, an
 // icon, and a label. Order encodes the natural workflow — ask, browse, add.
@@ -24,78 +23,115 @@ const NAV = [
   { to: ROUTES.UPLOAD, code: "03", label: "Upload", icon: UploadCloud },
 ];
 
+// The catalog rail. One component, two responsive personalities driven by
+// LayoutContext:
+//   - mobile  (< sm_tablet): fixed off-canvas drawer, slides over a backdrop.
+//   - tablet+ (sm_tablet)  : persistent rail; collapses to an icon-only mini rail.
 const Sidebar = () => {
   const { user, isAuthenticated, logout } = useAuth();
-  const { conversations, deleteConversation, deletingId, renameConversation } =
-    useConversations();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const activeId = searchParams.get("c");
+  const { isMobileOpen, closeMobile, isRailCollapsed, toggleRail } = useLayout();
+  const location = useLocation();
   const [showLogin, setShowLogin] = useState(false);
-  const [menuOpenId, setMenuOpenId] = useState(null);
-  const [editingId, setEditingId] = useState(null);
-  const [draftTitle, setDraftTitle] = useState("");
-  const menuRef = useRef(null);
 
-  // Open a past conversation by setting the ?c= param (ChatPage loads it).
-  const openConversation = (id) => setSearchParams({ c: id });
-
-  const handleDelete = (e, id) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setMenuOpenId(null);
-    if (editingId === id) {
-      setEditingId(null);
-      setDraftTitle("");
-    }
-    deleteConversation(id);
-    // If we deleted the open one, drop back to a fresh chat.
-    if (id === activeId) setSearchParams({});
-  };
-
-  const startEditing = (conversation) => {
-    setMenuOpenId(null);
-    setEditingId(conversation.id);
-    setDraftTitle(conversation.title);
-  };
-
-  const cancelEditing = () => {
-    setEditingId(null);
-    setDraftTitle("");
-  };
-
-  const submitRename = (conversationId) => {
-    const title = draftTitle.trim();
-    if (!title) {
-      cancelEditing();
-      return;
-    }
-    renameConversation({ id: conversationId, title });
-    setEditingId(null);
-    setDraftTitle("");
-  };
-
+  // Opening a route from the drawer should close it; do it on every navigation
+  // so links, recents, and back/forward all dismiss the mobile overlay.
   useEffect(() => {
-    if (!menuOpenId) return undefined;
-    const handlePointerDown = (event) => {
-      if (!menuRef.current?.contains(event.target)) {
-        setMenuOpenId(null);
-      }
+    closeMobile();
+  }, [location.pathname, location.search, closeMobile]);
+
+  // ESC closes the mobile drawer.
+  useEffect(() => {
+    if (!isMobileOpen) return undefined;
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") closeMobile();
     };
-    window.addEventListener("pointerdown", handlePointerDown);
-    return () => window.removeEventListener("pointerdown", handlePointerDown);
-  }, [menuOpenId]);
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isMobileOpen, closeMobile]);
+
+  // Collapsed only applies on tablet+; the drawer always shows full content.
+  const collapsed = isRailCollapsed;
+
+  // Text labels animate rather than snap. We keep them in the DOM and transition
+  // opacity + max-width + translate so the rail width and the text stay in sync.
+  // On expand the labels fade in with a short delay (after the rail has widened),
+  // which removes the "flutter"; on collapse they fade out immediately.
+  const labelTransition =
+    "transition-[opacity,max-width,transform] duration-200 ease-in-out motion-reduce:transition-none";
+  // Applied to a label wrapper: hidden+clipped when collapsed (tablet+), shown otherwise.
+  const collapsedHide = collapsed
+    ? "hidden sm_tablet:max-w-0 sm_tablet:-translate-x-1 sm_tablet:opacity-0 sm_tablet:pointer-events-none"
+    : "block max-w-[16rem] translate-x-0 opacity-100 delay-150 sm_tablet:delay-150";
 
   return (
     <>
-      <aside className="flex h-full shrink-0 flex-col border-r border-rule bg-surface/40 sm_tablet:w-64">
-        <div className="border-b border-rule px-6 py-6">
-          <p className="font-mono text-[0.65rem] uppercase tracking-[0.3em] text-brass">
-            Retrieval Index
-          </p>
-          <h1 className="mt-2 font-display text-2xl font-semibold leading-none text-ink">
-            Athenæum
-          </h1>
-          <p className="mt-1 text-xs text-muted">Grounded answers, with sources.</p>
+      <aside
+        aria-label="Catalog navigation"
+        className={`fixed inset-y-0 left-0 z-50 flex h-full flex-col border-r border-rule bg-surface backdrop-blur transition-[transform,width] duration-300 ease-in-out
+          w-72 max-w-[85vw]
+          ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}
+          sm_tablet:static sm_tablet:z-auto sm_tablet:max-w-none sm_tablet:translate-x-0 sm_tablet:bg-surface/40
+          ${collapsed ? "sm_tablet:w-16" : "sm_tablet:w-64"}`}
+      >
+        {/* Masthead. Collapsed (tablet+) it's a single centered button showing the
+            Æ mark, which swaps to the expand icon on hover/focus. Expanded, the
+            full wordmark sits left with the collapse toggle on the right. */}
+        <div
+          className={`flex items-start justify-between gap-2 border-b border-rule py-6 ${
+            collapsed ? "px-3 sm_tablet:px-2" : "px-4 sm_tablet:px-6"
+          }`}
+        >
+          {/* Full wordmark — fades/slides away as the rail collapses. */}
+          <div className={`min-w-0 overflow-hidden ${labelTransition} ${collapsedHide} `}>
+            <p className="whitespace-nowrap font-mono text-[0.65rem] uppercase tracking-[0.3em] text-brass">
+              Retrieval Index
+            </p>
+            <h1 className="mt-2 font-display text-2xl font-semibold leading-none text-ink">
+              Athenæum
+            </h1>
+            <p className="mt-1 whitespace-nowrap text-xs text-muted">
+              Grounded answers, with sources.
+            </p>
+          </div>
+
+          {/* Close button — drawer only. */}
+          <button
+            type="button"
+            onClick={closeMobile}
+            aria-label="Close navigation"
+            className="shrink-0 text-muted transition-colors hover:text-ink sm_tablet:hidden"
+          >
+            <X size={20} aria-hidden="true" />
+          </button>
+
+          {/* Collapse / expand toggle — tablet+ only. When collapsed it fills the
+              header centered, showing Æ by default and the expand icon on hover. */}
+          <button
+            type="button"
+            onClick={toggleRail}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-pressed={collapsed}
+            className={`group/toggle hidden shrink-0 text-muted transition-colors hover:text-ink sm_tablet:block ${
+              collapsed
+                ? "sm_tablet:relative sm_tablet:mx-auto sm_tablet:grid sm_tablet:h-9 sm_tablet:w-9 sm_tablet:place-items-center hover:!bg-ground border border-transparent hover:border-rule cursor-e-resize"
+                : "cursor-w-resize"
+            }`}
+          >
+            {collapsed ? (
+              <>
+                <span className="col-start-1 row-start-1 font-display text-xl font-semibold leading-none text-ink transition-opacity group-hover/toggle:opacity-0 group-focus-visible/toggle:opacity-0">
+                  Æ
+                </span>
+                <PanelLeftOpen
+                  size={18}
+                  aria-hidden="true"
+                  className="col-start-1 row-start-1 opacity-0 transition-opacity group-hover/toggle:opacity-100 group-focus-visible/toggle:opacity-100"
+                />
+              </>
+            ) : (
+              <PanelLeftClose size={18} aria-hidden="true" />
+            )}
+          </button>
         </div>
 
         <nav className="flex flex-col gap-1 p-3" aria-label="Primary">
@@ -104,8 +140,13 @@ const Sidebar = () => {
               key={to}
               to={to}
               end={end}
+              title={collapsed ? label : undefined}
               className={({ isActive }) =>
                 `group flex items-center gap-3 border px-3 py-3 text-sm transition-colors ${
+                  collapsed
+                    ? "sm_tablet:justify-center sm_tablet:gap-0 sm_tablet:px-0"
+                    : ""
+                } ${
                   isActive
                     ? "border-rule bg-ground text-ink"
                     : "border-transparent text-muted hover:border-rule hover:bg-ground/60 hover:text-ink"
@@ -115,136 +156,52 @@ const Sidebar = () => {
               {({ isActive }) => (
                 <>
                   <span
-                    className={`font-mono text-xs ${
+                    className={`overflow-hidden font-mono text-xs ${labelTransition} ${collapsedHide} ${
                       isActive ? "text-brass" : "text-rule group-hover:text-brass"
                     }`}
                   >
                     {code}
                   </span>
-                  <Icon size={18} strokeWidth={1.75} aria-hidden="true" />
-                  <span className="font-medium tracking-wide">{label}</span>
+                  <Icon
+                    size={18}
+                    strokeWidth={1.75}
+                    aria-hidden="true"
+                    className="shrink-0"
+                  />
+                  <span
+                    className={`overflow-hidden whitespace-nowrap font-medium tracking-wide ${labelTransition} ${collapsedHide}`}
+                  >
+                    {label}
+                  </span>
                 </>
               )}
             </NavLink>
           ))}
         </nav>
 
-        {isAuthenticated && conversations.length > 0 ? (
-          <div className="flex-1 flex min-h-0 flex-col border-t border-rule">
-            <p className="px-6 pb-2 pt-4 font-mono text-[0.6rem] uppercase tracking-[0.3em] text-brass">
-              History
-            </p>
-            <div className="flex-1 overflow-y-auto px-3 pb-2">
-              {conversations.map((c) => {
-                const isActive = c.id === activeId;
-                const isDeleting = c.id === deletingId;
-                const isEditing = c.id === editingId;
-                const isMenuOpen = c.id === menuOpenId;
-                return (
-                  <div
-                    key={c.id}
-                    className={`group flex items-center gap-2 border px-3 py-2 transition-colors ${
-                      isActive
-                        ? "border-rule bg-ground text-ink"
-                        : "border-transparent text-muted hover:border-rule hover:bg-ground/60 hover:text-ink"
-                    } ${isDeleting ? "opacity-50" : ""}`}
-                  >
-                    {isEditing ? (
-                      <form
-                        className="min-w-0 flex-1"
-                        onSubmit={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          submitRename(c.id);
-                        }}
-                      >
-                        <input
-                          value={draftTitle}
-                          onChange={(e) => setDraftTitle(e.target.value)}
-                          onClick={(e) => e.stopPropagation()}
-                          onBlur={() => cancelEditing()}
-                          onKeyDown={(e) => {
-                            if (e.key === "Escape") {
-                              e.preventDefault();
-                              cancelEditing();
-                            }
-                          }}
-                          autoFocus
-                          maxLength={80}
-                          className="min-w-0 flex-1 border border-rule bg-surface px-2 py-1 text-xs text-ink outline-none ring-0 placeholder:text-muted focus:border-brass"
-                        />
-                      </form>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => openConversation(c.id)}
-                        className="min-w-0 flex-1 text-left"
-                        title={c.title}
-                      >
-                        <span className="block truncate text-xs">
-                          {c.isGeneratingTitle ? (
-                            <TypewriterText
-                              key={`${c.id}:${c.title}`}
-                              text={c.title}
-                              speed={28}
-                              className="text-xs"
-                            />
-                          ) : (
-                            c.title
-                          )}
-                        </span>
-                      </button>
-                    )}
-                    <div className="relative shrink-0" ref={isMenuOpen ? menuRef : null}>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setMenuOpenId((current) => (current === c.id ? null : c.id));
-                        }}
-                        disabled={isDeleting || isEditing}
-                        aria-label="Conversation actions"
-                        className="shrink-0 text-rule opacity-0 transition-opacity hover:text-ink group-hover:opacity-100 disabled:opacity-30"
-                      >
-                        <Ellipsis size={14} />
-                      </button>
-                      {isMenuOpen ? (
-                        <div className="absolute right-0 top-6 z-50 min-w-28 border border-rule bg-surface py-1 shadow-lg">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              startEditing(c);
-                            }}
-                            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-ink transition-colors hover:bg-ground"
-                          >
-                            <Pencil size={12} />
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => handleDelete(e, c.id)}
-                            disabled={isDeleting}
-                            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-danger transition-colors hover:bg-ground disabled:opacity-50"
-                          >
-                            <Trash2 size={12} />
-                            Delete
-                          </button>
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ) : null}
+        {/* Recents heading + list. On the collapsed mini rail it fades out and is
+            then removed from layout (after the fade) so the icons stay centered. */}
+        <div
+          className={`flex min-h-0 flex-1 flex-col overflow-hidden transition-opacity duration-200 ease-in-out motion-reduce:transition-none ${
+            collapsed
+              ? "sm_tablet:pointer-events-none sm_tablet:opacity-0"
+              : "opacity-100 delay-150"
+          }`}
+        >
+          <p className="mt-6 whitespace-nowrap border-t border-rule px-6 py-3 font-mono text-[0.6rem] uppercase tracking-[0.3em] text-brass">
+            Recents
+          </p>
+          <SidebarRecents onNavigate={closeMobile} />
+        </div>
 
+        {/* Account footer. */}
         <div className="mt-auto border-t border-rule px-4 py-4">
           {isAuthenticated ? (
-            <div className="flex items-center gap-3">
+            <div
+              className={`flex items-center gap-3 ${
+                collapsed ? "sm_tablet:justify-center sm_tablet:gap-0" : ""
+              }`}
+            >
               {user.profileUrl ? (
                 <img
                   src={user.profileUrl}
@@ -258,7 +215,9 @@ const Sidebar = () => {
                   </span>
                 </div>
               )}
-              <div className="min-w-0 flex-1">
+              <div
+                className={`min-w-0 flex-1 overflow-hidden ${labelTransition} ${collapsedHide}`}
+              >
                 <p className="truncate text-xs font-medium text-ink">{user.name}</p>
                 <p className="truncate font-mono text-[0.6rem] text-muted">
                   {user.email}
@@ -268,7 +227,7 @@ const Sidebar = () => {
                 type="button"
                 onClick={logout}
                 aria-label="Sign out"
-                className="shrink-0 text-muted transition-colors hover:text-ink"
+                className={`overflow-hidden text-muted transition-colors hover:text-ink ${labelTransition} ${collapsedHide}`}
               >
                 <LogOut size={15} />
               </button>
@@ -277,10 +236,17 @@ const Sidebar = () => {
             <button
               type="button"
               onClick={() => setShowLogin(true)}
-              className="flex w-full items-center gap-2 border border-rule px-3 py-2 text-sm text-muted transition-colors hover:border-brass hover:text-ink"
+              title={collapsed ? "Sign in" : undefined}
+              className={`flex w-full items-center gap-2 border border-rule px-3 py-2 text-sm text-muted transition-colors hover:border-brass hover:text-ink ${
+                collapsed ? "sm_tablet:justify-center sm_tablet:gap-0 sm_tablet:px-0" : ""
+              }`}
             >
-              <LogIn size={15} aria-hidden="true" />
-              <span className="font-medium">Sign in</span>
+              <LogIn size={15} aria-hidden="true" className="shrink-0" />
+              <span
+                className={`overflow-hidden whitespace-nowrap font-medium ${labelTransition} ${collapsedHide}`}
+              >
+                Sign in
+              </span>
             </button>
           )}
         </div>

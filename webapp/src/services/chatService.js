@@ -18,7 +18,9 @@ function delay(ms) {
 export function endSession(sessionId) {
   if (!sessionId) return;
   const base = import.meta.env.VITE_API_BASE_URL || "";
-  fetch(`${base}${ENDPOINTS.querySession(sessionId)}`, { method: "DELETE" }).catch(() => {});
+  fetch(`${base}${ENDPOINTS.querySession(sessionId)}`, { method: "DELETE" }).catch(
+    () => {},
+  );
 }
 
 export function toSource(raw, index) {
@@ -61,10 +63,13 @@ function setSocketHandlers(ws) {
     }
     const { event, data } = msg;
     if (event === "session") activeHandlers.onSession?.(data.session_id);
-    else if (event === "conversation") activeHandlers.onConversation?.(data.conversation_id);
-    else if (event === "conversation_title") activeHandlers.onConversationTitle?.(data.text || "");
+    else if (event === "conversation")
+      activeHandlers.onConversation?.(data.conversation_id);
+    else if (event === "conversation_title")
+      activeHandlers.onConversationTitle?.(data.text || "");
     else if (event === "status") activeHandlers.onStatus?.(data.stage, data.message);
-    else if (event === "sources") activeHandlers.onSources?.((data.sources || []).map(toSource));
+    else if (event === "sources")
+      activeHandlers.onSources?.((data.sources || []).map(toSource));
     else if (event === "token") activeHandlers.onToken?.(data.text);
     else if (event === "done") {
       const handlers = activeHandlers;
@@ -92,7 +97,9 @@ function setSocketHandlers(ws) {
 
   ws.onerror = () => {
     if (activeHandlers) {
-      activeHandlers.onError?.("WebSocket connection error — check that the backend is running.");
+      activeHandlers.onError?.(
+        "WebSocket connection error — check that the backend is running.",
+      );
     }
   };
 }
@@ -105,32 +112,33 @@ export function ensureChatSocket() {
     return connectPromise;
   }
 
-  const openSocket = () => new Promise((resolve, reject) => {
-    let ws;
-    try {
-      ws = new WebSocket(buildWsUrl(ENDPOINTS.QUERY_WS));
-    } catch (err) {
-      reject(err);
-      return;
-    }
-
-    ws.onopen = () => {
-      sharedWs = ws;
-      setSocketHandlers(ws);
-      resolve(ws);
-    };
-
-    ws.onerror = () => {
-      ws.close();
-      reject(new Error("Failed to open WebSocket connection."));
-    };
-
-    ws.onclose = () => {
-      if (sharedWs === ws) {
-        sharedWs = null;
+  const openSocket = () =>
+    new Promise((resolve, reject) => {
+      let ws;
+      try {
+        ws = new WebSocket(buildWsUrl(ENDPOINTS.QUERY_WS));
+      } catch (err) {
+        reject(err);
+        return;
       }
-    };
-  });
+
+      ws.onopen = () => {
+        sharedWs = ws;
+        setSocketHandlers(ws);
+        resolve(ws);
+      };
+
+      ws.onerror = () => {
+        ws.close();
+        reject(new Error("Failed to open WebSocket connection."));
+      };
+
+      ws.onclose = () => {
+        if (sharedWs === ws) {
+          sharedWs = null;
+        }
+      };
+    });
 
   connectPromise = (async () => {
     try {
@@ -162,7 +170,16 @@ export function askStream(
   topK,
   sessionId,
   conversationId,
-  { onSession, onConversation, onConversationTitle, onStatus, onSources, onToken, onDone, onError },
+  {
+    onSession,
+    onConversation,
+    onConversationTitle,
+    onStatus,
+    onSources,
+    onToken,
+    onDone,
+    onError,
+  },
 ) {
   return new Promise((resolve) => {
     const connectWithRetry = async () => {
@@ -178,7 +195,6 @@ export function askStream(
 
         try {
           const socket = await ensureChatSocket();
-          onStatus?.("connected", "Connected. Sending your question...");
           return socket;
         } catch (err) {
           lastError = err;

@@ -37,9 +37,11 @@ export async function listConversations() {
   return (data || []).map(toSummary);
 }
 
-// Load one conversation's full transcript as ready-to-render messages.
-export async function getConversation(id) {
-  const data = unwrap(await conversationsApi.get(id));
+// Load one conversation's full transcript as ready-to-render messages. An
+// optional AbortSignal lets callers cancel a stale load when the user switches
+// conversations mid-fetch.
+export async function getConversation(id, { signal } = {}) {
+  const data = unwrap(await conversationsApi.get(id, { signal }));
   return {
     id: data.id,
     title: data.title || "Untitled",

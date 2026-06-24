@@ -5,7 +5,8 @@ import { ENDPOINTS } from "./endpoints";
 // Writing happens over the chat WebSocket; these are the read/manage calls.
 const list = () => apiClient.get(ENDPOINTS.CONVERSATIONS);
 
-const get = (id) => apiClient.get(ENDPOINTS.conversation(id));
+const get = (id, { signal } = {}) =>
+  apiClient.get(ENDPOINTS.conversation(id), {}, { signal });
 
 const update = (id, payload) => apiClient.patch(ENDPOINTS.conversation(id), payload);
 

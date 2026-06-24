@@ -44,7 +44,7 @@ def main():
         host="0.0.0.0",
         port=8000,
         reload=DEBUG,
-        log_level=LOG_LEVEL.lower(),
+        log_level=LOG_LEVEL,
     )
 
 if __name__ == "__main__":

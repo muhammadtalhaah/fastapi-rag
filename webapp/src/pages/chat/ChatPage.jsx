@@ -1,18 +1,13 @@
-import { useChat, useConversations } from "@/hooks";
 import Composer from "./Composer";
-import MessageTurn from "./MessageTurn";
-import { useSearchParams } from "react-router-dom";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { MessagesSquare, PenSquare } from "lucide-react";
-import { StateBlock } from "@/components/shared";
-import { LoginModal, LoginPrompt } from "@/components/auth";
 import { useAuth } from "@/context";
-
-const SUGGESTIONS = [
-  "What are the key findings?",
-  "Summarize the main argument.",
-  "What does it say about pricing?",
-];
+import MessageTurn from "./MessageTurn";
+import { MessagesSquare } from "lucide-react";
+import { StateBlock } from "@/components/shared";
+import { SUGGESTIONS } from "@/config/dummyData";
+import { useSearchParams } from "react-router-dom";
+import { useChat, useConversations } from "@/hooks";
+import { LoginModal, LoginPrompt } from "@/components/auth";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const ChatPage = () => {
   const { isAuthenticated, isLoading: isAuthLoading, oauthError } = useAuth();
@@ -55,6 +50,7 @@ const ChatPage = () => {
   const {
     messages,
     isAsking,
+    isLoadingConversation,
     connectionState,
     connectionMessage,
     activeConversationId,
@@ -86,10 +82,10 @@ const ChatPage = () => {
     // back to the base Ask route and expects a fresh chat.
     if (conversationParam && conversationParam !== activeConversationId) {
       loadConversation(conversationParam);
-    } else if (!conversationParam && activeConversationId && messages.length === 0) {
+    } else if (!conversationParam && activeConversationId) {
       newChat();
     }
-  }, [activeConversationId, conversationParam, loadConversation, messages.length, newChat]);
+  }, [activeConversationId, conversationParam, loadConversation, newChat]);
 
   // When a brand-new chat mints its conversation id, reflect it in the URL so a
   // refresh reopens it and the sidebar can highlight it.
@@ -100,21 +96,21 @@ const ChatPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the active id
   }, [activeConversationId]);
 
-  // "New chat" clears both the transcript and the URL param.
-  const handleNewChat = useCallback(() => {
-    newChat();
-    setSearchParams({}, { replace: true });
-  }, [newChat, setSearchParams]);
-
   // Login dialog visibility, and whether the guest prompt was dismissed for
   // this session. Chatting is never blocked — the prompt is a soft nudge.
   const [loginOpen, setLoginOpen] = useState(false);
   const [promptDismissed, setPromptDismissed] = useState(false);
 
-  // Keep the newest turn in view as the transcript grows.
+  // Keep the newest turn in view as the transcript grows. On a freshly loaded
+  // conversation jump instantly to the bottom (no visible scroll-through);
+  // while chatting, follow new tokens smoothly.
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages]);
+    if (isLoadingConversation) return;
+    endRef.current?.scrollIntoView({
+      behavior: isAsking ? "smooth" : "auto",
+      block: "end",
+    });
+  }, [messages, isAsking, isLoadingConversation]);
 
   const isEmpty = messages.length === 0;
   const isConnecting = connectionState === "connecting" || connectionState === "retrying";
@@ -129,41 +125,15 @@ const ChatPage = () => {
   const showLoginPrompt = !isAuthLoading && !isAuthenticated && !promptDismissed;
 
   return (
-    <div className="flex h-screen flex-col max-h-screen overflow-hidden justify-between">
-      <header className="flex-1 border-b border-rule flex-grow-0 pb-4">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <span className="font-mono text-xs uppercase tracking-[0.25em] text-brass">
-              01 · Ask
-            </span>
-            <h1 className="mt-2 font-display text-3xl font-semibold leading-none tracking-tight text-ink sm_desktop:text-4xl">
-              Ask the archive
-            </h1>
-          </div>
-          {!isEmpty ? (
-            <button
-              type="button"
-              onClick={handleNewChat}
-              disabled={isComposerDisabled}
-              className="flex items-center gap-1.5 border border-rule px-3 py-1.5 text-xs text-muted transition-colors hover:border-brass hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <PenSquare size={14} />
-              New chat
-            </button>
-          ) : null}
-        </div>
-        <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">
-          Every answer is drawn from your uploaded documents and shows the exact passages
-          it came from.
-        </p>
-      </header>
-
+    <div className="mx-auto flex w-full min-h-full max-w-4xl flex-1 flex-col px-4 sm_tablet:px-5">
       <div
-        className={`flex flex-1 flex-col gap-6 overflow-y-auto flex-grow-1
-        ${isEmpty ? "justify-center" : "justify-start  pt-20"}
+        className={`flex flex-1 flex-col gap-6
+        ${isEmpty ? "justify-center" : "justify-start pt-6 sm_tablet:pt-12"}
         `}
       >
-        {isEmpty ? (
+        {isLoadingConversation ? (
+          <></>
+        ) : isEmpty ? (
           <StateBlock
             variant="empty"
             icon={MessagesSquare}
@@ -186,14 +156,19 @@ const ChatPage = () => {
             }
           />
         ) : (
-          messages.map((message) => (
-            <MessageTurn key={message.id} message={message} onRetry={retry} />
+          messages.map((message, idx) => (
+            <MessageTurn
+              key={message.id}
+              message={message}
+              onRetry={retry}
+              isLast={messages.length - 1 === idx}
+            />
           ))
         )}
         <div ref={endRef} />
       </div>
 
-      <div className="flex-1 flex flex-col gap-2 flex-grow-0 pb-2">
+      <div className="sticky bottom-0 flex flex-col gap-2 bg-ground pb-2">
         {connectionMessage ? (
           <p role="status" aria-live="polite" className="text-center text-xs text-muted">
             {connectionMessage}
@@ -207,8 +182,7 @@ const ChatPage = () => {
         ) : null}
         <Composer onSubmit={send} disabled={isComposerDisabled} />
         <p className="text-center text-xs text-ink">
-          AI can make mistakes. Verify all information against
-          trusted sources before use.
+          AI can make mistakes. Verify all information against trusted sources before use.
         </p>
       </div>
 
