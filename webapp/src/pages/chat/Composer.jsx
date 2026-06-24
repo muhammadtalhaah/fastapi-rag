@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ArrowUp } from "lucide-react";
 
 // The ask box. Enter submits; Shift+Enter inserts a newline. Disabled while a
-// request is in flight so the single-turn backend isn't double-hit.
+// request is in flight or the chat transport is still connecting.
 const Composer = ({ onSubmit, disabled }) => {
   const [value, setValue] = useState("");
 

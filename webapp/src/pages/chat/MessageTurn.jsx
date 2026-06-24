@@ -55,8 +55,7 @@ const MessageTurn = ({ message, onRetry }) => {
   }
 
   const isLive = message.status === "pending" || message.status === "streaming";
-  const activityLabel =
-    message.activity || (message.status === "pending" ? "Connecting…" : null);
+  const activityLabel = message.activity || null;
 
   return (
     <div className="flex flex-col">

@@ -1,9 +1,8 @@
-import { useChat } from "@/hooks";
+import { useChat, useConversations } from "@/hooks";
 import Composer from "./Composer";
 import MessageTurn from "./MessageTurn";
-import { Link } from "react-router-dom";
-import { useEffect, useRef, useState } from "react";
-import { ROUTES } from "../../config/routes";
+import { useSearchParams } from "react-router-dom";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { MessagesSquare, PenSquare } from "lucide-react";
 import { StateBlock } from "@/components/shared";
 import { LoginModal, LoginPrompt } from "@/components/auth";
@@ -16,9 +15,96 @@ const SUGGESTIONS = [
 ];
 
 const ChatPage = () => {
-  const { messages, isAsking, send, retry, newChat } = useChat();
   const { isAuthenticated, isLoading: isAuthLoading, oauthError } = useAuth();
+  const { refresh: refreshHistory, upsertConversation } = useConversations();
+  const activeConversationIdRef = useRef(null);
+  // Refresh the sidebar history after each completed turn so a new conversation
+  // appears immediately.
+  const onTurnComplete = useCallback(() => {
+    if (activeConversationIdRef.current) {
+      upsertConversation({
+        id: activeConversationIdRef.current,
+        isGeneratingTitle: false,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+    refreshHistory();
+  }, [refreshHistory, upsertConversation]);
+  const handleConversationStart = useCallback(
+    (conversationId) => {
+      upsertConversation({
+        id: conversationId,
+        title: "",
+        updatedAt: new Date().toISOString(),
+        isGeneratingTitle: true,
+      });
+    },
+    [upsertConversation],
+  );
+  const handleConversationTitle = useCallback(
+    (conversationId, title) => {
+      upsertConversation({
+        id: conversationId,
+        title: title || "",
+        updatedAt: new Date().toISOString(),
+        isGeneratingTitle: true,
+      });
+    },
+    [upsertConversation],
+  );
+  const {
+    messages,
+    isAsking,
+    connectionState,
+    connectionMessage,
+    activeConversationId,
+    send,
+    retry,
+    newChat,
+    loadConversation,
+  } = useChat({
+    onTurnComplete,
+    onConversationStart: handleConversationStart,
+    onConversationTitle: handleConversationTitle,
+  });
   const endRef = useRef(null);
+
+  // The selected conversation is driven by the ?c=<id> URL param (per the
+  // codebase's "route-relevant state in the URL" convention). When it changes to
+  // an id we haven't loaded, pull that transcript in. An absent param means a
+  // fresh chat.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const conversationParam = searchParams.get("c");
+
+  useEffect(() => {
+    activeConversationIdRef.current = activeConversationId;
+  }, [activeConversationId]);
+
+  useEffect(() => {
+    // Keep the transcript aligned with the URL. A present ?c= opens that
+    // conversation; removing ?c= while one is active means the user navigated
+    // back to the base Ask route and expects a fresh chat.
+    if (conversationParam && conversationParam !== activeConversationId) {
+      loadConversation(conversationParam);
+    } else if (!conversationParam && activeConversationId && messages.length === 0) {
+      newChat();
+    }
+  }, [activeConversationId, conversationParam, loadConversation, messages.length, newChat]);
+
+  // When a brand-new chat mints its conversation id, reflect it in the URL so a
+  // refresh reopens it and the sidebar can highlight it.
+  useEffect(() => {
+    if (activeConversationId && activeConversationId !== conversationParam) {
+      setSearchParams({ c: activeConversationId }, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the active id
+  }, [activeConversationId]);
+
+  // "New chat" clears both the transcript and the URL param.
+  const handleNewChat = useCallback(() => {
+    newChat();
+    setSearchParams({}, { replace: true });
+  }, [newChat, setSearchParams]);
 
   // Login dialog visibility, and whether the guest prompt was dismissed for
   // this session. Chatting is never blocked — the prompt is a soft nudge.
@@ -31,6 +117,8 @@ const ChatPage = () => {
   }, [messages]);
 
   const isEmpty = messages.length === 0;
+  const isConnecting = connectionState === "connecting" || connectionState === "retrying";
+  const isComposerDisabled = isAsking || isConnecting;
   // Show the modal when the user opened it, or when we returned from a failed
   // Google sign-in (derived, so the error surfaces without an effect-driven
   // setState). Closing clears the explicit-open flag; the OAuth error is
@@ -52,17 +140,17 @@ const ChatPage = () => {
               Ask the archive
             </h1>
           </div>
-          {!isEmpty && (
+          {!isEmpty ? (
             <button
               type="button"
-              onClick={newChat}
-              disabled={isAsking}
+              onClick={handleNewChat}
+              disabled={isComposerDisabled}
               className="flex items-center gap-1.5 border border-rule px-3 py-1.5 text-xs text-muted transition-colors hover:border-brass hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
             >
               <PenSquare size={14} />
               New chat
             </button>
-          )}
+          ) : null}
         </div>
         <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">
           Every answer is drawn from your uploaded documents and shows the exact passages
@@ -88,6 +176,7 @@ const ChatPage = () => {
                     key={s}
                     type="button"
                     onClick={() => send(s)}
+                    disabled={isComposerDisabled}
                     className="border border-rule px-3 py-1.5 text-xs text-muted transition-colors hover:border-brass hover:text-ink"
                   >
                     {s}
@@ -105,22 +194,21 @@ const ChatPage = () => {
       </div>
 
       <div className="flex-1 flex flex-col gap-2 flex-grow-0 pb-2">
+        {connectionMessage ? (
+          <p role="status" aria-live="polite" className="text-center text-xs text-muted">
+            {connectionMessage}
+          </p>
+        ) : null}
         {showLoginPrompt ? (
           <LoginPrompt
             onLogin={() => setLoginOpen(true)}
             onDismiss={() => setPromptDismissed(true)}
           />
         ) : null}
-        <Composer onSubmit={send} disabled={isAsking} />
-        <p className="text-center text-xs text-muted">
-          No documents yet?{" "}
-          <Link
-            to={ROUTES.UPLOAD}
-            className="text-brass underline-offset-2 hover:underline"
-          >
-            Upload one
-          </Link>{" "}
-          to begin.
+        <Composer onSubmit={send} disabled={isComposerDisabled} />
+        <p className="text-center text-xs text-ink">
+          AI can make mistakes. Verify all information against
+          trusted sources before use.
         </p>
       </div>
 

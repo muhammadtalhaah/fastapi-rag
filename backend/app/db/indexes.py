@@ -7,7 +7,7 @@ same spec — so running this on every boot is safe and cheap.
 """
 import logging
 
-from pymongo import ASCENDING
+from pymongo import ASCENDING, DESCENDING
 from pymongo.database import Database
 
 from config import settings
@@ -45,4 +45,12 @@ def ensure_indexes(db: Database) -> None:
     # application-level check alone can't close).
     db.users.create_index([("email", ASCENDING)], unique=True, name="user_email_unique")
 
-    logger.info("[indexes] Auth indexes ensured (sessions, login_attempts, users)")
+    # --- conversations (durable per-user chat history) -----------------------
+    # The sidebar lists a user's conversations newest-first; this compound index
+    # serves that "by user, sorted by recency" query directly.
+    db.conversations.create_index(
+        [("user_id", ASCENDING), ("updated_at", DESCENDING)],
+        name="conversation_user_recent",
+    )
+
+    logger.info("[indexes] Indexes ensured (sessions, login_attempts, users, conversations)")

@@ -1,7 +1,6 @@
 /* eslint-disable react-refresh/only-export-components -- router config file, not a component module */
 import { lazy, Suspense } from "react";
 import { ROUTES } from "./config/routes";
-import { StateBlock } from "@/components/shared";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import { createBrowserRouter, Navigate } from "react-router-dom";
 
@@ -11,7 +10,7 @@ const DocumentsPage = lazy(() => import("@/pages/documents"));
 const UploadPage = lazy(() => import("@/pages/upload"));
 
 const withSuspense = (Page) => (
-  <Suspense fallback={<StateBlock variant="loading" message="Loading…" />}>
+  <Suspense fallback={null}>
     <Page />
   </Suspense>
 );

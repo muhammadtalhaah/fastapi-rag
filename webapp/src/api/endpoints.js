@@ -10,6 +10,8 @@ export const ENDPOINTS = {
   QUERY: `${BASE}/query/stream`,
   QUERY_WS: `${BASE}/query/ws`,
   querySession: (id) => `${BASE}/query/session/${id}`,
+  CONVERSATIONS: `${BASE}/conversations`,
+  conversation: (id) => `${BASE}/conversations/${id}`,
   INGEST: `${BASE}/ingest/`,
   ingestItem: (id) => `${BASE}/ingest/${id}`,
   documentDownload: (id) => `${BASE}/ingest/${id}/download`,
