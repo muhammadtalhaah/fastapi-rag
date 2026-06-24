@@ -3,12 +3,15 @@ import { useNavigate } from "react-router-dom";
 import { Library, RotateCw, Plus } from "lucide-react";
 import { PageHeader, StateBlock, AppButton } from "@/components/shared";
 import { ROUTES } from "@/config";
+import { useAuth } from "@/context";
 import { useDocuments } from "@/hooks";
 import DocumentRow from "./DocumentRow";
 import ConfirmDelete from "./ConfirmDelete";
 
 const DocumentsPage = () => {
   const navigate = useNavigate();
+  // Uploading requires signing in, so guests don't see the upload affordances.
+  const { isAuthenticated } = useAuth();
   const {
     documents,
     isLoading,
@@ -32,10 +35,12 @@ const DocumentsPage = () => {
         title="The collection"
         lede="Files indexed for retrieval. Each answer in Ask can only cite what lives here."
         actions={
-          <AppButton onClick={() => navigate(ROUTES.UPLOAD)}>
-            <Plus size={16} aria-hidden="true" />
-            Upload
-          </AppButton>
+          isAuthenticated ? (
+            <AppButton onClick={() => navigate(ROUTES.UPLOAD)}>
+              <Plus size={16} aria-hidden="true" />
+              Upload
+            </AppButton>
+          ) : null
         }
       />
 
@@ -59,12 +64,18 @@ const DocumentsPage = () => {
           variant="empty"
           icon={Library}
           title="The collection is empty"
-          message="Upload a PDF, text, Markdown, or Word file to make it searchable."
+          message={
+            isAuthenticated
+              ? "Upload a PDF, text, Markdown, or Word file to make it searchable."
+              : "No documents have been indexed yet. Sign in to add one."
+          }
           action={
-            <AppButton onClick={() => navigate(ROUTES.UPLOAD)}>
-              <Plus size={16} aria-hidden="true" />
-              Upload a document
-            </AppButton>
+            isAuthenticated ? (
+              <AppButton onClick={() => navigate(ROUTES.UPLOAD)}>
+                <Plus size={16} aria-hidden="true" />
+                Upload a document
+              </AppButton>
+            ) : null
           }
         />
       ) : (

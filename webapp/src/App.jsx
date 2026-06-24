@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "react-router-dom";
 import { useEffect } from "react";
 import { router } from "./routes";
-import { AuthProvider, ToastProvider, useAuth } from "@/context";
+import { AuthProvider, ThemeProvider, ToastProvider, useAuth } from "@/context";
 import { StateBlock } from "@/components/shared";
 import { ensureChatSocket } from "@/services/chatService";
 
@@ -38,11 +38,13 @@ function AuthGate() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ToastProvider>
-        <AuthProvider>
-          <AuthGate />
-        </AuthProvider>
-      </ToastProvider>
+      <ThemeProvider>
+        <ToastProvider>
+          <AuthProvider>
+            <AuthGate />
+          </AuthProvider>
+        </ToastProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

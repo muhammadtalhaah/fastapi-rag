@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import { AlertTriangle } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -122,10 +123,18 @@ const mdComponents = {
 
 const CENTALIZED_BOTTOM_MARGIN = "mb-40";
 
-const MessageTurn = ({ message, onRetry, isLast }) => {
+// Applied to a turn the user reached via search: a soft brass ring that makes
+// the matched message easy to spot after the scroll-to lands, and fades out once
+// the ?m= param is cleared (the box-shadow transition animates it away).
+const HIGHLIGHT_RING =
+  "rounded-sm ring-2 ring-brass/60 ring-offset-2 ring-offset-ground transition-[box-shadow] duration-700 motion-reduce:transition-none";
+
+const MessageTurn = forwardRef(({ message, onRetry, isLast, isHighlighted }, ref) => {
+  const highlightClass = isHighlighted ? HIGHLIGHT_RING : "";
+
   if (message.role === "user") {
     return (
-      <div className="flex justify-end">
+      <div ref={ref} className={`flex justify-end ${highlightClass}`}>
         <p className="max-w-[85%] border border-rule bg-surface px-4 py-2.5 text-sm leading-relaxed text-ink">
           {message.text}
         </p>
@@ -137,7 +146,7 @@ const MessageTurn = ({ message, onRetry, isLast }) => {
   const activityLabel = message.activity || null;
 
   return (
-    <div className="flex flex-col">
+    <div ref={ref} className={`flex flex-col ${highlightClass}`}>
       <div className="flex items-baseline gap-2">
         <span className="font-mono text-xs uppercase tracking-[0.2em] text-brass">
           Answer
@@ -201,6 +210,8 @@ const MessageTurn = ({ message, onRetry, isLast }) => {
       ) : null}
     </div>
   );
-};
+});
+
+MessageTurn.displayName = "MessageTurn";
 
 export default MessageTurn;

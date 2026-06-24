@@ -7,7 +7,7 @@ same spec — so running this on every boot is safe and cheap.
 """
 import logging
 
-from pymongo import ASCENDING, DESCENDING
+from pymongo import ASCENDING, DESCENDING, TEXT
 from pymongo.database import Database
 
 from config import settings
@@ -51,6 +51,17 @@ def ensure_indexes(db: Database) -> None:
     db.conversations.create_index(
         [("user_id", ASCENDING), ("updated_at", DESCENDING)],
         name="conversation_user_recent",
+    )
+    # Full-text search over the sidebar "search history" feature: a single text
+    # index spanning the title and every message body. Weighting the title higher
+    # than message text makes a title hit rank above an incidental body mention,
+    # which matches what users expect when searching their own threads. The query
+    # always pins user_id first (an equality filter Mongo can use the text index's
+    # implicit scoping for), so results never cross users.
+    db.conversations.create_index(
+        [("title", TEXT), ("messages.text", TEXT)],
+        weights={"title": 10, "messages.text": 2},
+        name="conversation_fulltext",
     )
 
     logger.info("[indexes] Indexes ensured (sessions, login_attempts, users, conversations)")

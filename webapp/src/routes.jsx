@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components -- router config file, not a component module */
 import { lazy, Suspense } from "react";
 import { ROUTES } from "./config/routes";
+import { useAuth } from "@/context";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import { createBrowserRouter, Navigate } from "react-router-dom";
 
@@ -15,13 +16,24 @@ const withSuspense = (Page) => (
   </Suspense>
 );
 
+// Permission gate for authenticated-only routes (e.g. upload). The app already
+// resolves the session in AuthGate before the router renders, so isAuthenticated
+// is settled here — a guest hitting /upload directly is redirected to Ask.
+const RequireAuth = ({ children }) => {
+  const { isAuthenticated } = useAuth();
+  return isAuthenticated ? children : <Navigate to={ROUTES.CHAT} replace />;
+};
+
 export const router = createBrowserRouter([
   {
     path: ROUTES.CHAT,
     element: <DashboardLayout />,
     children: [
       { index: true, element: withSuspense(ChatPage) },
-      { path: ROUTES.UPLOAD, element: withSuspense(UploadPage) },
+      {
+        path: ROUTES.UPLOAD,
+        element: <RequireAuth>{withSuspense(UploadPage)}</RequireAuth>,
+      },
       { path: ROUTES.DOCUMENTS, element: withSuspense(DocumentsPage) },
       { path: ROUTES.GLOBAL, element: <Navigate to={ROUTES.CHAT} replace /> },
     ],

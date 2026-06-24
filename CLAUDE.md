@@ -29,7 +29,7 @@ There is no test suite or linter configured yet.
 
 1. **Ingest** (`POST /api/v1/ingest/`) — file uploaded → stored in GridFS → parsed by llama-index → chunked (512 tokens, 50 overlap) → embedded in batches of 128 via Voyage AI (`voyage-4-large`) → chunks + embeddings stored in `chunks` collection.
 
-2. **Query** (`POST /api/v1/query/`) — question embedded → cosine similarity search (NumPy, manual, over all chunks) → top-k chunks assembled as context → Azure OpenAI (`gpt-4o`) generates answer → returns answer + source metadata.
+2. **Query** (`POST /api/v1/query/`) — question embedded → cosine similarity search (NumPy, manual, over all chunks) → top-k chunks assembled as context → Azure OpenAI (`gpt-5.4`) generates answer → returns answer + source metadata.
 
 **Layer responsibilities:**
 - `app/api/v1/` — HTTP routing only; delegates all logic to services

@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel
 
 
@@ -5,6 +7,12 @@ class QueryRequest(BaseModel):
     question: str
     top_k: int = 5
     session_id: str | None = None
+    # Which agent should answer this turn. "auto" (default) lets the router
+    # classify; an explicit route ("rag" | "general" | "web") is a manual
+    # override that always wins. Unknown/empty values are treated as "auto" by
+    # the router, so this stays a plain string rather than an enum — it must
+    # never reject a request on the routing field alone.
+    mode: str = "auto"
 
 
 class SourceChunk(BaseModel):
@@ -13,6 +21,23 @@ class SourceChunk(BaseModel):
     chunk_index: int
     text: str
     score: float
+
+
+class WebSource(BaseModel):
+    """A web citation emitted by the Web Search agent (PBI 25335).
+
+    Deliberately distinct from :class:`SourceChunk` (document chunks) so the
+    ``sources`` stream event can carry either kind. The ``type`` field is the
+    discriminator the UI branches on: web citations link out to a ``url``;
+    document sources do not have one. RAG document sources are emitted without a
+    ``type`` (treated as ``"document"`` by clients), so the RAG wire contract is
+    unchanged.
+    """
+
+    type: Literal["web"] = "web"
+    title: str
+    url: str
+    snippet: str
 
 
 class QueryResponse(BaseModel):

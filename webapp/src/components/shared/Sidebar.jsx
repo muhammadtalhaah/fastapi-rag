@@ -3,24 +3,27 @@ import { NavLink, useLocation } from "react-router-dom";
 import {
   Library,
   LogIn,
-  LogOut,
   MessagesSquare,
   PanelLeftClose,
   PanelLeftOpen,
+  Search,
   UploadCloud,
   X,
 } from "lucide-react";
 import { ROUTES } from "@/config/routes";
-import { useAuth, useLayout } from "@/context";
+import { useAuth, useLayout, useThemeContext } from "@/context";
 import { LoginModal } from "@/components/auth";
 import SidebarRecents from "./SidebarRecents";
+import AccountMenu from "./AccountMenu";
+import SearchModal from "./SearchModal";
 
 // Nav reads like a card-catalog index: each entry has a brass call-number, an
 // icon, and a label. Order encodes the natural workflow — ask, browse, add.
+// `authOnly` entries are hidden from guests (uploading requires signing in).
 const NAV = [
   { to: ROUTES.CHAT, code: "01", label: "Ask", icon: MessagesSquare, end: true },
   { to: ROUTES.DOCUMENTS, code: "02", label: "Documents", icon: Library },
-  { to: ROUTES.UPLOAD, code: "03", label: "Upload", icon: UploadCloud },
+  { to: ROUTES.UPLOAD, code: "03", label: "Upload", icon: UploadCloud, authOnly: true },
 ];
 
 // The catalog rail. One component, two responsive personalities driven by
@@ -30,8 +33,10 @@ const NAV = [
 const Sidebar = () => {
   const { user, isAuthenticated, logout } = useAuth();
   const { isMobileOpen, closeMobile, isRailCollapsed, toggleRail } = useLayout();
+  const { theme, toggleTheme } = useThemeContext();
   const location = useLocation();
   const [showLogin, setShowLogin] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
 
   // Opening a route from the drawer should close it; do it on every navigation
   // so links, recents, and back/forward all dismiss the mobile overlay.
@@ -51,6 +56,9 @@ const Sidebar = () => {
 
   // Collapsed only applies on tablet+; the drawer always shows full content.
   const collapsed = isRailCollapsed;
+
+  // Guests don't see upload-only nav entries (uploading requires signing in).
+  const navItems = NAV.filter((item) => !item.authOnly || isAuthenticated);
 
   // Text labels animate rather than snap. We keep them in the DOM and transition
   // opacity + max-width + translate so the rail width and the text stay in sync.
@@ -135,7 +143,7 @@ const Sidebar = () => {
         </div>
 
         <nav className="flex flex-col gap-1 p-3" aria-label="Primary">
-          {NAV.map(({ to, code, label, icon: Icon, end }) => (
+          {navItems.map(({ to, code, label, icon: Icon, end }) => (
             <NavLink
               key={to}
               to={to}
@@ -181,57 +189,46 @@ const Sidebar = () => {
 
         {/* Recents heading + list. On the collapsed mini rail it fades out and is
             then removed from layout (after the fade) so the icons stay centered. */}
-        <div
-          className={`flex min-h-0 flex-1 flex-col overflow-hidden transition-opacity duration-200 ease-in-out motion-reduce:transition-none ${
-            collapsed
-              ? "sm_tablet:pointer-events-none sm_tablet:opacity-0"
-              : "opacity-100 delay-150"
-          }`}
-        >
-          <p className="mt-6 whitespace-nowrap border-t border-rule px-6 py-3 font-mono text-[0.6rem] uppercase tracking-[0.3em] text-brass">
-            Recents
-          </p>
-          <SidebarRecents onNavigate={closeMobile} />
-        </div>
+        {isAuthenticated && (
+          <div
+            className={`flex min-h-0 flex-1 flex-col overflow-hidden transition-opacity duration-200 ease-in-out motion-reduce:transition-none ${
+              collapsed
+                ? "sm_tablet:pointer-events-none sm_tablet:opacity-0"
+                : "opacity-100 delay-150"
+            }`}
+          >
+            <div className="mt-6 flex items-center justify-between border-t border-rule px-6 py-3">
+              <p className="whitespace-nowrap font-mono text-[0.6rem] uppercase tracking-[0.3em] text-brass">
+                Recents
+              </p>
 
-        {/* Account footer. */}
-        <div className="mt-auto border-t border-rule px-4 py-4">
-          {isAuthenticated ? (
-            <div
-              className={`flex items-center gap-3 ${
-                collapsed ? "sm_tablet:justify-center sm_tablet:gap-0" : ""
-              }`}
-            >
-              {user.profileUrl ? (
-                <img
-                  src={user.profileUrl}
-                  alt={user.name}
-                  className="h-8 w-8 shrink-0 rounded-full object-cover ring-1 ring-rule"
-                />
-              ) : (
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ground ring-1 ring-rule">
-                  <span className="font-mono text-xs text-brass">
-                    {user.name?.[0]?.toUpperCase() ?? "?"}
-                  </span>
-                </div>
-              )}
-              <div
-                className={`min-w-0 flex-1 overflow-hidden ${labelTransition} ${collapsedHide}`}
-              >
-                <p className="truncate text-xs font-medium text-ink">{user.name}</p>
-                <p className="truncate font-mono text-[0.6rem] text-muted">
-                  {user.email}
-                </p>
-              </div>
               <button
                 type="button"
-                onClick={logout}
-                aria-label="Sign out"
-                className={`overflow-hidden text-muted transition-colors hover:text-ink ${labelTransition} ${collapsedHide}`}
+                onClick={() => setShowSearch(true)}
+                aria-label="Search conversations"
+                title="Search conversations"
+                className="-mr-1 shrink-0 text-muted transition-colors hover:text-ink"
               >
-                <LogOut size={15} />
+                <Search size={14} aria-hidden="true" />
               </button>
             </div>
+            <SidebarRecents onNavigate={closeMobile} />
+          </div>
+        )}
+
+        {/* Account footer. When signed in, the theme toggle lives inside the
+            account popup; guests get a standalone toggle next to Sign in. */}
+        <div className="mt-auto border-t border-rule px-4 py-4">
+          {isAuthenticated ? (
+            <AccountMenu
+              user={user}
+              onLogout={logout}
+              theme={theme}
+              onToggleTheme={toggleTheme}
+              collapsed={collapsed}
+              labelTransition={labelTransition}
+              collapsedHide={collapsedHide}
+            />
           ) : (
             <button
               type="button"
@@ -253,6 +250,7 @@ const Sidebar = () => {
       </aside>
 
       {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
+      {showSearch && <SearchModal onClose={() => setShowSearch(false)} />}
     </>
   );
 };

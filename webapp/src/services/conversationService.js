@@ -37,6 +37,42 @@ export async function listConversations() {
   return (data || []).map(toSummary);
 }
 
+// Map a backend search result row to the shape the search modal renders. Each
+// snippet keeps its `messageIndex` so clicking a result can scroll to and
+// highlight the exact message in the reopened conversation.
+function toSearchResult(raw) {
+  return {
+    id: raw.id,
+    title: raw.title || "Untitled",
+    updatedAt: raw.updated_at || null,
+    titleMatch: Boolean(raw.title_match),
+    snippets: (raw.snippets || []).map((s) => ({
+      role: s.role,
+      snippet: s.snippet || "",
+      messageIndex: s.message_index,
+    })),
+  };
+}
+
+// Search conversation titles and message bodies. Returns relevance-ordered
+// results plus pagination metadata. An AbortSignal lets the caller cancel a
+// superseded request as the user keeps typing.
+export async function searchConversations(
+  { query, limit = 20, offset = 0 },
+  { signal } = {},
+) {
+  const data = unwrap(
+    await conversationsApi.search({ q: query, limit, offset }, { signal }),
+  );
+  return {
+    results: (data?.results || []).map(toSearchResult),
+    total: data?.total ?? 0,
+    limit: data?.limit ?? limit,
+    offset: data?.offset ?? offset,
+    hasMore: Boolean(data?.has_more),
+  };
+}
+
 // Load one conversation's full transcript as ready-to-render messages. An
 // optional AbortSignal lets callers cancel a stale load when the user switches
 // conversations mid-fetch.

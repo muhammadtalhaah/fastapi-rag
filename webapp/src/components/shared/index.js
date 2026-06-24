@@ -4,4 +4,7 @@ export { default as AppButton } from "./AppButton";
 export { default as CopyButton } from "./CopyButton";
 export { default as PageHeader } from "./PageHeader";
 export { default as Sidebar } from "./Sidebar";
+export { default as AccountMenu } from "./AccountMenu";
 export { default as TypewriterText } from "./TypewriterText";
+export { default as SearchModal } from "./SearchModal";
+export { default as SearchResultItem } from "./SearchResultItem";

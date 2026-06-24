@@ -1,10 +1,17 @@
 import json
 import logging
 
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 from models.query import QueryRequest, QueryResponse
-from services import auth_session_service, conversation_service, query_service, session_service, user_service
+from services import (
+    auth_session_service,
+    conversation_service,
+    orchestrator_service,
+    query_service,
+    session_service,
+    user_service,
+)
 import db.connection as db_connection
 from config import settings
 
@@ -40,11 +47,24 @@ def _resolve_ws_user(websocket: WebSocket, db) -> dict | None:
     return user_service.get_user(db, session["user_id"])
 
 
-def _validate(body: QueryRequest, db):
+def _validate_input(body: QueryRequest):
+    """Transport-agnostic input validation that applies to every route.
+
+    The "no documents -> 404" gate is NOT here anymore: it is RAG-specific and
+    now lives in the orchestrator (it only fires when a turn is actually routed
+    to RAG), so general/web questions are no longer blocked by an empty
+    knowledge base.
+    """
     if not body.question.strip():
         raise HTTPException(status_code=422, detail="Question must not be empty.")
     if not (1 <= body.top_k <= 20):
         raise HTTPException(status_code=422, detail="top_k must be between 1 and 20.")
+
+
+def _validate(body: QueryRequest, db):
+    """Full validation for the legacy non-streaming RAG endpoint, which always
+    answers from documents and so keeps the pre-flight 404 gate."""
+    _validate_input(body)
     if db.chunks.count_documents({}) == 0:
         raise HTTPException(status_code=404, detail="No documents have been ingested yet.")
 
@@ -76,10 +96,14 @@ def end_session(session_id: str):
 
 
 @router.post("/stream")
-async def query_documents_stream(body: QueryRequest):
+async def query_documents_stream(body: QueryRequest, request: Request):
     db = get_db()
-    _validate(body, db)
-    logger.info("[stream-endpoint] Accepted request: question=%r top_k=%d", body.question[:80], body.top_k)
+    _validate_input(body)
+    client_ip = request.client.host if request.client else None
+    logger.info(
+        "[stream-endpoint] Accepted request: question=%r top_k=%d mode=%r",
+        body.question[:80], body.top_k, body.mode,
+    )
 
     session_id, session = session_service.get_or_create(body.session_id)
 
@@ -87,7 +111,10 @@ async def query_documents_stream(body: QueryRequest):
         # Tell the client its session id first so a freshly-minted one is captured.
         yield f"event: session\ndata: {json.dumps({'session_id': session_id})}\n\n"
         try:
-            async for frame in query_service.query_stream(db, body.question, body.top_k, session):
+            async for frame in orchestrator_service.run_stream(
+                db, body.question, top_k=body.top_k, mode=body.mode,
+                session=session, client_ip=client_ip,
+            ):
                 yield frame
         except ValueError as e:
             # Intentional, user-facing message raised by the service layer.
@@ -127,12 +154,15 @@ async def query_websocket(websocket: WebSocket):
                 continue
 
             try:
-                _validate(body, db)
+                _validate_input(body)
             except HTTPException as e:
                 await websocket.send_text(json.dumps({"event": "error", "data": {"message": e.detail}}))
                 continue
 
-            logger.info("[ws-endpoint] Accepted: question=%r top_k=%d", body.question[:80], body.top_k)
+            logger.info(
+                "[ws-endpoint] Accepted: question=%r top_k=%d mode=%r",
+                body.question[:80], body.top_k, body.mode,
+            )
 
             session_id, session = session_service.get_or_create(body.session_id)
             await websocket.send_text(json.dumps({"event": "session", "data": {"session_id": session_id}}))
@@ -165,9 +195,13 @@ async def query_websocket(websocket: WebSocket):
 
             captured_sources: list[dict] = []
             answer_parts: list[str] = []
+            client_ip = websocket.client.host if websocket.client else None
 
             try:
-                async for frame in query_service.query_stream(db, body.question, body.top_k, session):
+                async for frame in orchestrator_service.run_stream(
+                    db, body.question, top_k=body.top_k, mode=body.mode,
+                    session=session, client_ip=client_ip,
+                ):
                     event_match = None
                     data_match = None
                     for line in frame.splitlines():

@@ -17,6 +17,7 @@ Design notes (consistent with the rest of the codebase):
   - Only authenticated users get persistence; guest turns never reach here.
 """
 import logging
+import re
 from datetime import datetime, timezone
 import asyncio
 from typing import AsyncIterator
@@ -26,6 +27,7 @@ from bson.errors import InvalidId
 from openai import AzureOpenAI
 from pymongo import DESCENDING, ReturnDocument
 from pymongo.database import Database
+from pymongo.errors import OperationFailure
 
 from config import AZURE_API_KEY, AZURE_BASE_URL
 
@@ -210,6 +212,146 @@ def delete_conversation(db: Database, conversation_id: str, user_id: str) -> boo
         return False
     result = db.conversations.delete_one({"_id": oid, "user_id": user_id})
     return result.deleted_count == 1
+
+
+# --- search ------------------------------------------------------------------
+# How many message snippets to return per conversation, and how much text to show
+# around the match. Kept small so the modal list stays scannable and the payload
+# light.
+_MAX_SNIPPETS_PER_CONVO = 3
+_SNIPPET_RADIUS = 60
+
+
+def _make_snippet(text: str, match_start: int, match_end: int) -> str:
+    """A short window of `text` centered on [match_start, match_end), with ellipses
+    where it's been truncated. The actual highlighting happens client-side."""
+    text = text or ""
+    start = max(0, match_start - _SNIPPET_RADIUS)
+    end = min(len(text), match_end + _SNIPPET_RADIUS)
+    snippet = text[start:end].strip()
+    if start > 0:
+        snippet = "… " + snippet
+    if end < len(text):
+        snippet = snippet + " …"
+    return snippet
+
+
+def _extract_snippets(messages: list[dict], pattern: "re.Pattern[str]") -> list[dict]:
+    """Find messages whose text matches `pattern` and build a navigable snippet for
+    each (capped at _MAX_SNIPPETS_PER_CONVO). `message_index` is the position in the
+    stored messages array, which the frontend uses to scroll to the message."""
+    snippets: list[dict] = []
+    for index, message in enumerate(messages or []):
+        if len(snippets) >= _MAX_SNIPPETS_PER_CONVO:
+            break
+        text = message.get("text") or ""
+        match = pattern.search(text)
+        if not match:
+            continue
+        snippets.append({
+            "role": message.get("role") or "assistant",
+            "snippet": _make_snippet(text, match.start(), match.end()),
+            "message_index": index,
+        })
+    return snippets
+
+
+def _query_pattern(query: str) -> "re.Pattern[str]":
+    """Case-insensitive regex matching any whitespace-separated term in the query.
+    Used both for the mongomock fallback filter and for snippet extraction so the
+    highlighted text matches what the user typed."""
+    terms = [re.escape(term) for term in (query or "").split() if term]
+    if not terms:
+        # Matches nothing — callers guard against empty queries, but be safe.
+        return re.compile(r"(?!x)x")
+    return re.compile("|".join(terms), re.IGNORECASE)
+
+
+def _matching_conversations(db: Database, user_id: str, query: str) -> list[dict]:
+    """All of the user's conversations matching `query`, ordered by relevance.
+
+    Uses MongoDB's `$text` index (fast, relevance-scored) when available; falls
+    back to a per-user regex scan when the deployment/driver lacks `$text`
+    (e.g. mongomock in tests). Either way the result is the user's matching
+    conversation documents with their full `messages` for snippet extraction.
+    """
+    base = {"user_id": user_id}
+    try:
+        cursor = db.conversations.find(
+            {**base, "$text": {"$search": query}},
+            {"score": {"$meta": "textScore"}, "title": 1, "messages": 1,
+             "created_at": 1, "updated_at": 1},
+        ).sort([("score", {"$meta": "textScore"})])
+        return list(cursor)
+    except (OperationFailure, NotImplementedError, TypeError):
+        # No usable `$text` index for this deployment/driver (real MongoDB without
+        # the text index, or mongomock — which doesn't implement `$text` or
+        # textScore sorting). Scan the user's conversations and filter in Python,
+        # newest-first so relevance ties resolve to recency.
+        return _regex_scan(db, base, query)
+
+
+def _regex_scan(db: Database, base: dict, query: str) -> list[dict]:
+    """Fallback search: load the user's conversations and keep those whose title
+    or any message text matches the query, newest-first."""
+    pattern = _query_pattern(query)
+    docs = db.conversations.find(base).sort("updated_at", DESCENDING)
+    matched = []
+    for doc in docs:
+        title = doc.get("title") or ""
+        if pattern.search(title) or any(
+            pattern.search(m.get("text") or "") for m in doc.get("messages", [])
+        ):
+            matched.append(doc)
+    return matched
+
+
+def search_conversations(
+    db: Database,
+    user_id: str,
+    query: str,
+    limit: int = 20,
+    offset: int = 0,
+) -> dict:
+    """Search a user's conversation titles and message bodies for `query`.
+
+    Returns a paginated, relevance-ordered result set. Each result carries the
+    matching message snippets (with their array index) needed to navigate to and
+    highlight the exact message in the transcript. A blank query returns nothing.
+    """
+    query = (query or "").strip()
+    if not query:
+        return {"results": [], "total": 0, "limit": limit, "offset": offset, "has_more": False}
+
+    pattern = _query_pattern(query)
+    matched = _matching_conversations(db, user_id, query)
+
+    results = []
+    for doc in matched:
+        title = doc.get("title") or "Untitled"
+        snippets = _extract_snippets(doc.get("messages", []), pattern)
+        title_match = bool(pattern.search(title))
+        # A doc surfaced by $text might match only on a stemmed/stop-word token our
+        # simple regex doesn't; keep it if either the title or any message matched.
+        if not title_match and not snippets:
+            continue
+        results.append({
+            "id": str(doc["_id"]),
+            "title": title,
+            "updated_at": doc.get("updated_at"),
+            "title_match": title_match,
+            "snippets": snippets,
+        })
+
+    total = len(results)
+    page = results[offset:offset + limit]
+    return {
+        "results": page,
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "has_more": offset + limit < total,
+    }
 
 
 def owns_conversation(db: Database, conversation_id: str, user_id: str) -> bool:

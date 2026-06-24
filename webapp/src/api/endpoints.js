@@ -11,6 +11,7 @@ export const ENDPOINTS = {
   QUERY_WS: `${BASE}/query/ws`,
   querySession: (id) => `${BASE}/query/session/${id}`,
   CONVERSATIONS: `${BASE}/conversations`,
+  CONVERSATION_SEARCH: `${BASE}/conversations/search`,
   conversation: (id) => `${BASE}/conversations/${id}`,
   INGEST: `${BASE}/ingest/`,
   ingestItem: (id) => `${BASE}/ingest/${id}`,
