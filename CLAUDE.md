@@ -18,7 +18,7 @@ uvicorn app.main:app --reload
 
 Required environment variables (loaded via `app/config/api_keys.py`):
 - `VOYAGE_API_KEY` — Voyage AI embeddings
-- `AZURE_OPENAI_API_KEY` and `AZURE_OPENAI_BASE_URL` — Azure OpenAI (deployment: `gpt-4o`)
+- `AZURE_OPENAI_API_KEY` and `AZURE_OPENAI_BASE_URL` — Azure OpenAI (deployment: `gpt-5.4`)
 - `MONGODB_CONNECTION_STRING` — MongoDB Atlas
 
 There is no test suite or linter configured yet.

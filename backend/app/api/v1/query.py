@@ -145,6 +145,13 @@ async def query_websocket(websocket: WebSocket):
                     db, requested_conversation_id, user["id"]
                 ):
                     conversation_id = requested_conversation_id
+                    # Reopening a past conversation: the in-memory context session
+                    # is freshly minted (empty) because it doesn't survive a reload.
+                    # Prime it from the durable transcript so follow-ups keep the
+                    # thread instead of starting cold.
+                    convo = conversation_service.get_conversation(db, conversation_id, user["id"])
+                    if convo:
+                        session_service.hydrate_from_transcript(session, convo.get("messages", []))
                 else:
                     conversation_id = conversation_service.create_conversation(db, user["id"], body.question)
                 await websocket.send_text(

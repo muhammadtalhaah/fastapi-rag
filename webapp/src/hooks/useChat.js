@@ -23,7 +23,16 @@ const makeId = () => `m${nextId++}`;
 //   "streaming"  — tokens are arriving (text is built incrementally)
 //   "done"       — complete
 //   "error"      — failed
-export function useChat({ onTurnComplete, onConversationStart, onConversationTitle } = {}) {
+// `onConversationUnavailable` is called when a requested conversation can't be
+// opened because it doesn't exist or isn't accessible to the current user
+// (HTTP 404 / 401) — the caller is expected to notify the user and drop the
+// dangling conversation id from the URL.
+export function useChat({
+  onTurnComplete,
+  onConversationStart,
+  onConversationTitle,
+  onConversationUnavailable,
+} = {}) {
   const [messages, setMessages] = useState([]);
   const [isAsking, setIsAsking] = useState(false);
   const [isLoadingConversation, setIsLoadingConversation] = useState(false);
@@ -50,7 +59,6 @@ export function useChat({ onTurnComplete, onConversationStart, onConversationTit
     ]);
     setIsAsking(true);
     setConnectionState("connecting");
-    setConnectionMessage("Connecting to the chat service...");
 
     const patch = (fields) =>
       setMessages((prev) =>
@@ -174,11 +182,26 @@ export function useChat({ onTurnComplete, onConversationStart, onConversationTit
       setIsAsking(false);
       setConnectionState("idle");
       setConnectionMessage("");
-    } catch {
+    } catch (error) {
       // An aborted load was superseded by a newer one — leave the UI to that
       // request and don't surface an error.
       if (controller.signal.aborted) return;
-      // Surface a minimal error turn rather than failing silently.
+      // A missing or inaccessible conversation (deleted, or owned by someone
+      // else / requires sign-in). Reset to a fresh chat and let the caller
+      // notify the user and clear the stale id from the URL, rather than
+      // stranding them on a broken transcript.
+      if (error?.status === 404 || error?.status === 401) {
+        sessionIdRef.current = null;
+        conversationIdRef.current = null;
+        setActiveConversationId(null);
+        setMessages([]);
+        setConnectionState("idle");
+        setConnectionMessage("");
+        onConversationUnavailable?.(conversationId, error.status);
+        return;
+      }
+      // Any other failure: surface a minimal error turn rather than failing
+      // silently.
       setMessages([
         {
           id: makeId(),
@@ -199,7 +222,7 @@ export function useChat({ onTurnComplete, onConversationStart, onConversationTit
         setIsLoadingConversation(false);
       }
     }
-  }, [isAsking]);
+  }, [isAsking, onConversationUnavailable]);
 
   return {
     messages,

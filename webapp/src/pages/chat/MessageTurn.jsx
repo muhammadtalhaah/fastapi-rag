@@ -1,8 +1,19 @@
 import { AlertTriangle } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Spinner, AppButton } from "@/components/shared";
+import rehypeHighlight from "rehype-highlight";
+import { Spinner, AppButton, CopyButton } from "@/components/shared";
 import SourcesLedger from "./SourcesLedger";
+
+// Recursively pull the plain text out of react-markdown's rendered children so a
+// code block can be copied verbatim (the children are React nodes, not a string).
+const nodeText = (node) => {
+  if (node == null || typeof node === "boolean") return "";
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(nodeText).join("");
+  if (node.props) return nodeText(node.props.children);
+  return "";
+};
 
 // Tailwind prose-style component map for react-markdown.
 const mdComponents = {
@@ -10,13 +21,24 @@ const mdComponents = {
     <p className="mb-3 last:mb-0 leading-relaxed text-ink">{children}</p>
   ),
   h1: ({ children }) => (
-    <h1 className="mb-2 mt-4 text-xl font-semibold text-ink">{children}</h1>
+    <h1 className="mb-3 mt-5 border-b border-rule pb-1.5 text-xl font-semibold tracking-tight text-ink first:mt-0">
+      {children}
+    </h1>
   ),
   h2: ({ children }) => (
-    <h2 className="mb-2 mt-4 text-lg font-semibold text-ink">{children}</h2>
+    <h2 className="mb-2 mt-5 text-lg font-semibold tracking-tight text-ink first:mt-0">
+      {children}
+    </h2>
   ),
   h3: ({ children }) => (
-    <h3 className="mb-1 mt-3 text-base font-semibold text-ink">{children}</h3>
+    <h3 className="mb-1.5 mt-4 text-base font-semibold text-ink first:mt-0">
+      {children}
+    </h3>
+  ),
+  h4: ({ children }) => (
+    <h4 className="mb-1 mt-3 text-sm font-semibold uppercase tracking-wide text-muted first:mt-0">
+      {children}
+    </h4>
   ),
   ul: ({ children }) => (
     <ul className="mb-3 ml-5 list-disc space-y-1 text-ink">{children}</ul>
@@ -29,16 +51,44 @@ const mdComponents = {
     <strong className="font-semibold text-ink">{children}</strong>
   ),
   em: ({ children }) => <em className="italic">{children}</em>,
-  code: ({ inline, children }) =>
-    inline ? (
-      <code className="rounded bg-surface px-1 py-0.5 font-mono text-sm text-brass">
+  // In react-markdown v10 the `inline` prop is gone; block code is the only
+  // child of a <pre>, inline code is not. We detect a fenced block by the
+  // `language-*` class that rehype-highlight/remark attaches, and let the
+  // `pre` renderer below own the block chrome (border, padding, scroll).
+  code: ({ className, children, ...props }) => {
+    const isBlock = /\blanguage-/.test(className || "");
+    if (isBlock) {
+      return (
+        <code className={`hljs font-mono text-sm ${className || ""}`} {...props}>
+          {children}
+        </code>
+      );
+    }
+    return (
+      <code className="rounded bg-surface px-1.5 py-0.5 font-mono text-[0.85em] text-brass">
         {children}
       </code>
-    ) : (
-      <pre className="mb-3 overflow-x-auto rounded border border-rule bg-surface p-3">
-        <code className="font-mono text-sm text-ink">{children}</code>
-      </pre>
-    ),
+    );
+  },
+  pre: ({ children }) => {
+    // Pull the language tag off the inner <code> for the corner label.
+    const codeEl = Array.isArray(children) ? children[0] : children;
+    const lang = (codeEl?.props?.className || "")
+      .split(/\s+/)
+      .find((c) => c.startsWith("language-"))
+      ?.replace("language-", "");
+    return (
+      <div className="group relative mb-3 overflow-hidden rounded border border-rule bg-surface">
+        <div className="flex items-center justify-between gap-2 border-b border-rule px-3 py-1">
+          <span className="font-mono text-[0.7rem] uppercase tracking-wider text-muted">
+            {lang || "text"}
+          </span>
+          <CopyButton getText={() => nodeText(children)} title="Copy code" />
+        </div>
+        <pre className="overflow-x-auto p-3 leading-relaxed">{children}</pre>
+      </div>
+    );
+  },
   blockquote: ({ children }) => (
     <blockquote className="mb-3 border-l-2 border-brass pl-3 italic text-ink/70">
       {children}
@@ -104,11 +154,25 @@ const MessageTurn = ({ message, onRetry, isLast }) => {
         <div
           className={`mt-2 text-[0.95rem] ${message.sources?.length > 0 ? "" : isLast && CENTALIZED_BOTTOM_MARGIN} `}
         >
-          <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            rehypePlugins={[[rehypeHighlight, { detect: true, ignoreMissing: true }]]}
+            components={mdComponents}
+          >
             {message.text}
           </ReactMarkdown>
           {message.status === "streaming" ? (
             <span className="ml-0.5 inline-block h-[1em] w-[2px] animate-pulse bg-brass align-middle" />
+          ) : null}
+          {message.status === "done" ? (
+            <div className="mt-3">
+              <CopyButton
+                getText={() => message.text}
+                label="Copy response"
+                copiedLabel="Copied"
+                title="Copy response"
+              />
+            </div>
           ) : null}
         </div>
       ) : null}

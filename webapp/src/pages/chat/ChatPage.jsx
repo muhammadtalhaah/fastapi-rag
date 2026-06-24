@@ -1,6 +1,6 @@
 import Composer from "./Composer";
-import { useAuth } from "@/context";
 import MessageTurn from "./MessageTurn";
+import { useAuth, useToast } from "@/context";
 import { MessagesSquare } from "lucide-react";
 import { StateBlock } from "@/components/shared";
 import { SUGGESTIONS } from "@/config/dummyData";
@@ -11,7 +11,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 const ChatPage = () => {
   const { isAuthenticated, isLoading: isAuthLoading, oauthError } = useAuth();
+  const { showToast } = useToast();
   const { refresh: refreshHistory, upsertConversation } = useConversations();
+  // Driven by the ?c=<id> URL param: opening a conversation removes/sets it.
+  // Declared up here so the not-found handler below can clear it.
+  const [searchParams, setSearchParams] = useSearchParams();
   const activeConversationIdRef = useRef(null);
   // Refresh the sidebar history after each completed turn so a new conversation
   // appears immediately.
@@ -47,6 +51,13 @@ const ChatPage = () => {
     },
     [upsertConversation],
   );
+  // A requested conversation that 404s/401s (deleted, or not ours / needs
+  // sign-in) can't be opened. Tell the user and drop the dangling ?c= so the
+  // URL-sync effect lands them on a fresh chat at the base Ask route.
+  const handleConversationUnavailable = useCallback(() => {
+    showToast("Chat not found.");
+    setSearchParams({}, { replace: true });
+  }, [showToast, setSearchParams]);
   const {
     messages,
     isAsking,
@@ -62,14 +73,12 @@ const ChatPage = () => {
     onTurnComplete,
     onConversationStart: handleConversationStart,
     onConversationTitle: handleConversationTitle,
+    onConversationUnavailable: handleConversationUnavailable,
   });
   const endRef = useRef(null);
 
-  // The selected conversation is driven by the ?c=<id> URL param (per the
-  // codebase's "route-relevant state in the URL" convention). When it changes to
-  // an id we haven't loaded, pull that transcript in. An absent param means a
-  // fresh chat.
-  const [searchParams, setSearchParams] = useSearchParams();
+  // When it changes to an id we haven't loaded, pull that transcript in. An
+  // absent param means a fresh chat.
   const conversationParam = searchParams.get("c");
 
   useEffect(() => {

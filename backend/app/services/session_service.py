@@ -54,6 +54,39 @@ def delete_session(session_id: str) -> bool:
     return existed
 
 
+def hydrate_from_transcript(session: dict, messages: list[dict], recent_turns: int = RECENT_TURNS) -> None:
+    """Prime an empty context session from a durable conversation transcript.
+
+    Used when a logged-in user reopens a past conversation: the in-memory context
+    (summary + recent window) doesn't survive a reload, so without this the LLM
+    would see no prior turns and lose the thread. We keep the freshest
+    `recent_turns` messages verbatim and fold anything older into a plain-text
+    summary placeholder so follow-ups still resolve against earlier context.
+
+    No-op if the session already holds context (don't clobber a live session) or
+    the transcript is empty.
+    """
+    if session.get("recent") or (session.get("summary") or "").strip():
+        return
+    normalized = [
+        {"role": m.get("role"), "content": m.get("text") or m.get("content") or ""}
+        for m in messages
+        if m.get("role") in ("user", "assistant") and (m.get("text") or m.get("content"))
+    ]
+    if not normalized:
+        return
+    session["recent"] = normalized[-recent_turns:]
+    overflow = normalized[:-recent_turns] if len(normalized) > recent_turns else []
+    if overflow:
+        session["summary"] = "Earlier in this conversation:\n" + "\n".join(
+            f"{m['role']}: {m['content']}" for m in overflow
+        )
+    logger.info(
+        "[session] hydrated from transcript: %d recent, %d folded into summary",
+        len(session["recent"]), len(overflow),
+    )
+
+
 def build_history(session: dict) -> list[dict]:
     """Compose the compact history sent to the LLM: summary (as a system note)
     followed by the verbatim recent window."""

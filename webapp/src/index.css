@@ -4,9 +4,13 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  /* Committed palette — slate-ink ground, paper-white ink, retrieval teal, archival brass.
-     Teal appears ONLY on retrieved/scored data; brass marks call-numbers and structure. */
+/* Committed palette — an archive aesthetic in two themes. Teal appears ONLY on
+   retrieved/scored data; brass marks call-numbers and structure. All color in the
+   app routes through these eight tokens; switching [data-theme] reskins everything.
+   The dark set is the original committed palette and is the default fallback. */
+:root,
+:root[data-theme="dark"] {
+  /* Dark — slate-ink ground, paper-white ink, retrieval teal, archival brass. */
   --ground: 20 24 29; /* #14181D */
   --surface: 27 32 39; /* #1B2027 */
   --rule: 47 55 64; /* #2F3740 */
@@ -15,6 +19,27 @@
   --retrieval: 79 209 197; /* #4FD1C5 */
   --brass: 201 162 39; /* #C9A227 */
   --danger: 224 122 95; /* #E07A5F */
+
+  /* hljs literals tuned to the dark palette (see syntax theme below). */
+  --code-number: 217 184 95; /* lighter brass for literals */
+  --code-title: 124 198 220; /* desaturated teal for identifiers */
+}
+
+:root[data-theme="light"] {
+  /* Light — warm paper ground, slate ink. Same archive language, intentionally
+     designed (not an inversion): teal/brass deepened to read on a paper field. */
+  --ground: 244 242 236; /* #F4F2EC — warm paper, not stark white */
+  --surface: 252 251 247; /* #FCFBF7 — raised stock, a shade above ground */
+  --rule: 214 209 198; /* #D6D1C6 — warm hairline */
+  --ink: 38 43 51; /* #262B33 — slate ink (mirrors the dark ground hue) */
+  --muted: 109 114 122; /* #6D727A — mid-grey, AA on paper */
+  --retrieval: 13 148 136; /* #0D9488 — deep teal, contrast on light */
+  --brass: 158 122 13; /* #9E7A0D — deeper brass, readable on paper */
+  --danger: 192 86 56; /* #C05638 — deeper terracotta */
+
+  /* hljs literals re-tuned so code stays legible on the light surface. */
+  --code-number: 146 110 8; /* darker brass for literals */
+  --code-title: 21 122 145; /* darker teal for identifiers */
 }
 
 * {
@@ -70,4 +95,64 @@ body {
     animation-duration: 0.001ms !important;
     transition-duration: 0.001ms !important;
   }
+}
+
+/* highlight.js syntax theme — tuned to the slate-ink / brass / teal palette.
+   Applied to fenced code blocks rendered by react-markdown + rehype-highlight. */
+.hljs {
+  color: rgb(var(--ink));
+  background: transparent;
+}
+.hljs-comment,
+.hljs-quote {
+  color: rgb(var(--muted));
+  font-style: italic;
+}
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-section,
+.hljs-doctag,
+.hljs-name,
+.hljs-type {
+  color: rgb(var(--brass));
+  font-weight: 500;
+}
+.hljs-string,
+.hljs-regexp,
+.hljs-addition,
+.hljs-attribute,
+.hljs-meta .hljs-string {
+  color: rgb(var(--retrieval));
+}
+.hljs-number,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-link {
+  color: rgb(var(--code-number));
+}
+.hljs-title,
+.hljs-title.class_,
+.hljs-title.function_,
+.hljs-built_in,
+.hljs-builtin-name {
+  color: rgb(var(--code-title));
+}
+.hljs-attr,
+.hljs-property,
+.hljs-params,
+.hljs-tag {
+  color: rgb(var(--ink) / 0.85);
+}
+.hljs-meta,
+.hljs-deletion {
+  color: rgb(var(--danger));
+}
+.hljs-emphasis {
+  font-style: italic;
+}
+.hljs-strong {
+  font-weight: 600;
 }
