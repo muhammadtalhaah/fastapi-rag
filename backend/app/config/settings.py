@@ -1,99 +1,162 @@
 """
 Authentication & session configuration.
 
-Uses Pydantic Settings so every security-relevant knob (cookie flags, session
-lifetime, lockout policy, session-binding) is centralized, typed, and overridable
-via environment variables / the project ``.env`` file. This keeps the existing
-``config/api_keys.py`` untouched — this module is purely additive.
+Flat module-level constants loaded from environment variables / the project
+``.env`` file. The ``settings`` namespace object at the bottom exposes every
+constant as an attribute so all existing ``settings.<attr>`` call-sites continue
+to work without modification.
 """
+import os
 from pathlib import Path
 from typing import Literal
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from dotenv import load_dotenv
 
-# .env lives at backend/.env — two levels up from this file (config/ -> app/ -> backend/).
 _ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
+load_dotenv(_ENV_FILE, override=False)
 
 
-class AuthSettings(BaseSettings):
-    """Security configuration for session-based auth.
+# ---------------------------------------------------------------------------
+# Helpers — read typed values from the environment
+# ---------------------------------------------------------------------------
 
-    Defaults are production-safe (Secure cookies, SameSite=Lax, UA binding on).
-    For local HTTP development set ``COOKIE_SECURE=false`` so the browser will
-    actually store the cookie over http://localhost.
-    """
+def _bool(key: str, default: bool) -> bool:
+    raw = os.environ.get(key)
+    if raw is None:
+        return default
+    return raw.strip().lower() not in ("0", "false", "no", "off")
 
-    model_config = SettingsConfigDict(
-        env_file=str(_ENV_FILE),
-        env_file_encoding="utf-8",
-        extra="ignore",  # tolerate the many non-auth keys already in .env
-    )
 
-    # --- Cookie names --------------------------------------------------------
-    session_cookie_name: str = "session_id"
-    csrf_cookie_name: str = "csrf_token"
+def _int(key: str, default: int) -> int:
+    raw = os.environ.get(key)
+    return int(raw) if raw is not None else default
 
-    # --- Session lifetime ----------------------------------------------------
-    # Total lifetime of a session, in seconds. Also drives cookie Max-Age and
-    # the server-side ``expires_at`` field (the authoritative expiry check).
-    session_ttl_seconds: int = 86_400  # 24h
-    # If true, every successful validation pushes expires_at forward (sliding
-    # window). If false, sessions expire a fixed time after creation.
-    session_sliding: bool = True
 
-    # --- Cookie security flags ----------------------------------------------
-    # HttpOnly is ALWAYS true (not configurable) — JS must never read the
-    # session id. Secure/SameSite are configurable for dev ergonomics.
-    cookie_secure: bool = True
-    cookie_samesite: Literal["lax", "strict", "none"] = "lax"
-    cookie_domain: str | None = None
-    cookie_path: str = "/"
+def _str(key: str, default: str) -> str:
+    return os.environ.get(key, default)
 
-    # --- Brute-force / lockout ----------------------------------------------
-    login_max_attempts: int = 5
-    login_lockout_seconds: int = 900  # 15 min lockout after max attempts
-    # Failed-attempt records are TTL-expired after this many seconds of
-    # inactivity so the collection stays small.
-    login_attempt_ttl_seconds: int = 3_600
 
-    # --- Session binding (hijacking mitigation) -----------------------------
-    # Binding to User-Agent is cheap and catches stolen-cookie replay from a
-    # different client. IP binding is OFF by default because mobile/NAT IPs
-    # legitimately change mid-session and would cause false logouts.
-    bind_session_to_user_agent: bool = True
-    bind_session_to_ip: bool = False
+def _str_or_none(key: str) -> str | None:
+    return os.environ.get(key) or None
 
-    # --- Password policy -----------------------------------------------------
-    password_min_length: int = 8
-    # bcrypt only considers the first 72 bytes; we cap input length explicitly
-    # at registration so users aren't silently truncated (see security.py).
-    password_max_length: int = 72
 
-    # --- Google OAuth (Authorization Code flow) -----------------------------
-    # Obtain these from the Google Cloud Console (APIs & Services -> Credentials
-    # -> OAuth 2.0 Client ID, type "Web application"). The redirect URI must be
-    # registered there EXACTLY and must point at our /auth/google/callback.
-    # Leave the id/secret empty to disable Google sign-in (the endpoints then
-    # return 503 instead of crashing).
-    google_client_id: str = ""
-    google_client_secret: str = ""
-    google_redirect_uri: str = "http://localhost:8000/api/v1/auth/google/callback"
+def _list(key: str, default: list[str]) -> list[str]:
+    raw = os.environ.get(key)
+    if raw is None:
+        return default
+    return [item.strip() for item in raw.split(",") if item.strip()]
 
-    # Where the callback sends the browser after a successful (or failed) login —
-    # i.e. back into the SPA. The frontend then re-checks /auth/me.
-    oauth_post_login_redirect: str = "http://localhost:5173/"
 
-    # Secret used by Starlette's SessionMiddleware to sign the short-lived cookie
-    # that holds the OAuth `state`/nonce during the redirect round-trip. This is
-    # NOT our app session (that's the server-side session store); it only guards
-    # the OAuth handshake against CSRF. Override in production with a long random
-    # value. MUST be set to something non-empty.
-    oauth_state_secret: str = "change-me-dev-only-oauth-state-secret"
+# ---------------------------------------------------------------------------
+# Cookie names
+# ---------------------------------------------------------------------------
+session_cookie_name: str = _str("SESSION_COOKIE_NAME", "session_id")
+csrf_cookie_name: str = _str("CSRF_COOKIE_NAME", "csrf_token")
+
+# ---------------------------------------------------------------------------
+# Session lifetime
+# ---------------------------------------------------------------------------
+session_ttl_seconds: int = _int("SESSION_TTL_SECONDS", 86_400)
+# Sliding window: every successful validation pushes expires_at forward.
+session_sliding: bool = _bool("SESSION_SLIDING", True)
+
+# ---------------------------------------------------------------------------
+# Cookie security flags
+# HttpOnly is always enforced in code — JS must never read the session id.
+# ---------------------------------------------------------------------------
+cookie_secure: bool = _bool("COOKIE_SECURE", True)
+cookie_samesite: Literal["lax", "strict", "none"] = _str("COOKIE_SAMESITE", "lax")  # type: ignore[assignment]
+cookie_domain: str | None = _str_or_none("COOKIE_DOMAIN")
+cookie_path: str = _str("COOKIE_PATH", "/")
+
+# ---------------------------------------------------------------------------
+# Brute-force / lockout
+# ---------------------------------------------------------------------------
+login_max_attempts: int = _int("LOGIN_MAX_ATTEMPTS", 5)
+login_lockout_seconds: int = _int("LOGIN_LOCKOUT_SECONDS", 900)
+# Failed-attempt records are TTL-expired after this many seconds of inactivity.
+login_attempt_ttl_seconds: int = _int("LOGIN_ATTEMPT_TTL_SECONDS", 3_600)
+
+# ---------------------------------------------------------------------------
+# Session binding (hijacking mitigation)
+# IP binding is off by default — mobile/NAT IPs change mid-session legitimately.
+# ---------------------------------------------------------------------------
+bind_session_to_user_agent: bool = _bool("BIND_SESSION_TO_USER_AGENT", True)
+bind_session_to_ip: bool = _bool("BIND_SESSION_TO_IP", False)
+
+# ---------------------------------------------------------------------------
+# CORS
+# ---------------------------------------------------------------------------
+cors_allowed_origins: list[str] = _list(
+    "CORS_ALLOWED_ORIGINS", ["http://localhost:5173"]
+)
+
+# ---------------------------------------------------------------------------
+# Password policy
+# bcrypt considers only the first 72 bytes; max_length prevents silent truncation.
+# ---------------------------------------------------------------------------
+password_min_length: int = _int("PASSWORD_MIN_LENGTH", 8)
+password_max_length: int = _int("PASSWORD_MAX_LENGTH", 72)
+
+# ---------------------------------------------------------------------------
+# Google OAuth (Authorization Code flow)
+# Leave client_id/secret empty to disable Google sign-in (routes return 503).
+# ---------------------------------------------------------------------------
+google_client_id: str = _str("GOOGLE_CLIENT_ID", "")
+google_client_secret: str = _str("GOOGLE_CLIENT_SECRET", "")
+google_redirect_uri: str = _str(
+    "GOOGLE_REDIRECT_URI", "http://localhost:8000/api/v1/auth/google/callback"
+)
+# Where the callback redirects the browser after a successful login (back to the SPA).
+oauth_post_login_redirect: str = _str("OAUTH_POST_LOGIN_REDIRECT", "http://localhost:5173/")
+# Signs the short-lived OAuth state cookie during the redirect round-trip only.
+oauth_state_secret: str = _str("OAUTH_STATE_SECRET", "change-me-dev-only-oauth-state-secret")
+
+
+# ---------------------------------------------------------------------------
+# Derived helpers
+# ---------------------------------------------------------------------------
+
+def google_enabled() -> bool:
+    return bool(google_client_id and google_client_secret)
+
+
+# ---------------------------------------------------------------------------
+# Compatibility namespace — ``from config import settings; settings.foo``
+# keeps working everywhere without touching callers.
+# ---------------------------------------------------------------------------
+
+class _Settings:
+    """Read-only attribute view over this module's constants."""
+
+    session_cookie_name = session_cookie_name
+    csrf_cookie_name = csrf_cookie_name
+    session_ttl_seconds = session_ttl_seconds
+    session_sliding = session_sliding
+    cookie_secure = cookie_secure
+    cookie_samesite = cookie_samesite
+    cookie_domain = cookie_domain
+    cookie_path = cookie_path
+    login_max_attempts = login_max_attempts
+    login_lockout_seconds = login_lockout_seconds
+    login_attempt_ttl_seconds = login_attempt_ttl_seconds
+    bind_session_to_user_agent = bind_session_to_user_agent
+    bind_session_to_ip = bind_session_to_ip
+    cors_allowed_origins = cors_allowed_origins
+    password_min_length = password_min_length
+    password_max_length = password_max_length
+    google_client_id = google_client_id
+    google_client_secret = google_client_secret
+    google_redirect_uri = google_redirect_uri
+    oauth_post_login_redirect = oauth_post_login_redirect
+    oauth_state_secret = oauth_state_secret
 
     @property
     def google_enabled(self) -> bool:
-        return bool(self.google_client_id and self.google_client_secret)
+        return google_enabled()
 
 
-# Single shared instance — import this everywhere.
-settings = AuthSettings()
+settings = _Settings()
+
+# Kept for the ``from config.settings import AuthSettings`` import in __init__.py.
+AuthSettings = _Settings

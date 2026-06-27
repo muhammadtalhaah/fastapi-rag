@@ -97,7 +97,7 @@ const SidebarRecents = ({ onNavigate }) => {
             <div
               key={c.id}
               onClick={() => openConversation(c.id)}
-              className={`group flex cursor-pointer items-center gap-2 border px-3 py-2 transition-colors ${
+              className={`group flex cursor-pointer items-center gap-2 border p-1 transition-colors ${
                 isActive
                   ? "border-rule bg-ground text-ink"
                   : "border-transparent text-muted hover:border-rule hover:bg-ground/60 hover:text-ink"

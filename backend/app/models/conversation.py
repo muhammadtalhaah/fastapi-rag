@@ -1,8 +1,14 @@
 from datetime import datetime
+from typing import Union
 
 from pydantic import BaseModel, Field
 
-from models.query import SourceChunk
+from models.query import SourceChunk, WebSource
+
+# Web sources have a "type": "web" discriminator field; RAG sources do not have
+# "type" in the stored dict (legacy data). Pydantic tries WebSource first (it
+# requires "url"), then falls back to SourceChunk.
+AnySource = Union[WebSource, SourceChunk]
 
 
 class ConversationSummary(BaseModel):
@@ -17,7 +23,11 @@ class ConversationMessage(BaseModel):
     role: str  # "user" | "assistant"
     text: str
     # Only assistant turns carry sources; default empty for user turns.
-    sources: list[SourceChunk] = []
+    sources: list[AnySource] = []
+    # Display name of the model that generated this assistant turn. Absent on
+    # user turns and on messages stored before this field existed (older
+    # conversations stay valid; the client falls back gracefully).
+    model_name: str | None = None
     created_at: datetime | None = None
 
 

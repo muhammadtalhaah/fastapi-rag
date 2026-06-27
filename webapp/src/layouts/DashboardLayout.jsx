@@ -46,7 +46,7 @@ const DashboardShell = () => {
       <main className="min-w-0 flex-1 overflow-y-auto">
         <div
           className={`mx-auto flex min-h-full flex-col ${
-            isHome ? "py-0" : "max-w-4xl px-4 py-6 sm_tablet:px-5 sm_tablet:py-8 sm_desktop:px-10"
+            isHome ? "py-0" : "max-w-3xl px-4 py-6 sm_tablet:px-5 sm_tablet:py-8 sm_desktop:px-10"
           }`}
         >
           <Outlet />

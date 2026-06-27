@@ -25,7 +25,7 @@ from typing import AsyncIterator, Callable
 
 from pymongo.database import Database
 
-from services import router_service
+from services import query_service, router_service
 from services.agents import registry
 
 logger = logging.getLogger(__name__)
@@ -65,6 +65,7 @@ async def run_stream(
     *,
     top_k: int = 5,
     mode: str | None = "auto",
+    web_search: bool = True,
     session: dict | None = None,
     request_id: str | None = None,
     client_ip: str | None = None,
@@ -82,7 +83,18 @@ async def run_stream(
 
     # --- Stage 1: routing ---------------------------------------------------
     t0 = time.perf_counter()
-    route, reason = router_service.resolve_route(question, mode, classifier=classifier)
+    # Most recent prior user turn (if any) anchors a follow-up to the same
+    # capability the topic was being answered with.
+    prior_user = None
+    if session:
+        prior_user = next(
+            (m.get("content") for m in reversed(session.get("recent", []))
+             if m.get("role") == "user" and m.get("content")),
+            None,
+        )
+    route, reason = router_service.resolve_route(
+        question, mode, web_search=web_search, prior_user=prior_user, classifier=classifier
+    )
     routing_ms = (time.perf_counter() - t0) * 1000
 
     agent = registry.get(route)
@@ -112,6 +124,12 @@ async def run_stream(
     if route == "rag" and db.chunks.count_documents({}) == 0:
         logger.info("[orchestrator:%s] RAG route but no documents ingested", rid)
         raise ValueError(NO_DOCUMENTS_MESSAGE)
+
+    # Announce the model that will generate this answer, before any tokens. The
+    # WS layer captures it to persist alongside the assistant turn, and the
+    # client renders it as metadata under the answer. All registered agents
+    # generate through the same Azure deployment today.
+    yield _sse("model", {"name": query_service.MODEL_DISPLAY_NAME})
 
     async for frame in agent["stream"](
         db, question, top_k=top_k, session=session, request_id=rid, client_ip=client_ip

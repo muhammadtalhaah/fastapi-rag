@@ -3,6 +3,7 @@ import { lazy, Suspense } from "react";
 import { ROUTES } from "./config/routes";
 import { useAuth } from "@/context";
 import DashboardLayout from "@/layouts/DashboardLayout";
+import RouteError from "@/pages/error";
 import { createBrowserRouter, Navigate } from "react-router-dom";
 
 // Route-level code splitting: each page is its own chunk.
@@ -28,6 +29,7 @@ export const router = createBrowserRouter([
   {
     path: ROUTES.CHAT,
     element: <DashboardLayout />,
+    errorElement: <RouteError />,
     children: [
       { index: true, element: withSuspense(ChatPage) },
       {

@@ -40,6 +40,8 @@ from services.query_service import (
     AZURE_DEPLOYMENT,
     azure_client,
     _count_tokens,
+    _retrieval_query,
+    _trim_history,
     summarize_overflow,
 )
 
@@ -54,10 +56,13 @@ SNIPPET_MAX_CHARS = 300
 
 SYNTHESIS_SYSTEM_PROMPT = (
     "You are a web-research assistant. Answer the user's question using ONLY the "
-    "numbered web search results provided below — do not use prior knowledge and "
-    "do not invent facts. Cite the result number in square brackets (e.g. [1], "
-    "[2]) immediately after each claim it supports. If the results do not contain "
-    "enough information to answer, say so plainly and do not guess.\n\n"
+    "numbered web search results provided below — do not invent facts. Cite the "
+    "result number in square brackets (e.g. [1], [2]) immediately after each claim "
+    "it supports. If the results do not contain enough information to answer, say so "
+    "plainly and do not guess.\n\n"
+    "Use the conversation history to resolve follow-up questions and pronouns "
+    "(e.g. 'it', 'that', 'the score') — the conversation gives you the topic the "
+    "user is asking about, and the web results give you the facts to answer with.\n\n"
     "Format the answer as clean GitHub-flavored Markdown: use short paragraphs, "
     "bullet lists, and **bold** for key terms where they aid readability. Keep it "
     "concise and directly responsive to the question."
@@ -146,9 +151,11 @@ async def stream(
     yield _sse("status", {"stage": "searching", "message": "Searching the web..."})
     max_results = max(1, min(top_k, web_search_client.DEFAULT_MAX_RESULTS))
     t0 = time.perf_counter()
+    history = session_service.build_history(session) if session else []
+    search_query = _retrieval_query(question, history)
     # Provider call is blocking I/O -> offload so the event loop stays free.
     # ValueError (friendly provider errors) propagates to the route layer.
-    results = await asyncio.to_thread(web_search_client.search, question, max_results=max_results)
+    results = await asyncio.to_thread(web_search_client.search, search_query, max_results=max_results)
     logger.info("[web-agent:%s] search done in %.2fs, %d results",
                 rid, time.perf_counter() - t0, len(results))
 
@@ -173,6 +180,7 @@ async def stream(
     context = _build_context(results)
     messages = [
         {"role": "system", "content": SYNTHESIS_SYSTEM_PROMPT},
+        *_trim_history(history),
         {"role": "user", "content": f"Web search results:\n{context}\n\nQuestion: {question}"},
     ]
 

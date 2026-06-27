@@ -1,5 +1,7 @@
 import { Check, Copy } from "lucide-react";
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
+import AppTooltip from "./AppTooltip";
+import LNG from "@/language";
 
 // Compact copy control that confirms with a check + label for a couple seconds.
 // `getText` is called lazily on click so callers can pass freshly-derived text
@@ -8,10 +10,10 @@ import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 const CopyButton = ({
   getText,
   label,
-  copiedLabel = "Copied",
-  size = 14,
+  copiedLabel = "",
+  size = 16,
   className = "",
-  title = "Copy",
+  title = "",
 }) => {
   const { copied, copy } = useCopyToClipboard();
 
@@ -21,22 +23,24 @@ const CopyButton = ({
   };
 
   return (
-    <button
-      type="button"
-      onClick={handleClick}
-      title={copied ? copiedLabel : title}
-      aria-label={copied ? copiedLabel : title}
-      className={`inline-flex items-center gap-1.5 font-mono text-[0.7rem] uppercase tracking-wider transition-colors ${
-        copied ? "text-brass" : "text-muted hover:text-ink"
-      } ${className}`}
-    >
-      {copied ? (
-        <Check size={size} aria-hidden="true" />
-      ) : (
-        <Copy size={size} aria-hidden="true" />
-      )}
-      {label != null ? <span>{copied ? copiedLabel : label}</span> : null}
-    </button>
+    <AppTooltip title={copied ? "" : LNG.eng.copyResponse}>
+      <button
+        type="button"
+        onClick={handleClick}
+        title={copied ? copiedLabel : title}
+        aria-label={copied ? copiedLabel : title}
+        className={`inline-flex items-center gap-1.5 font-mono text-[0.7rem] uppercase tracking-wider transition-colors ${
+          copied ? "text-brass" : "text-muted hover:text-ink"
+        } ${className}`}
+      >
+        {copied ? (
+          <Check size={size} aria-hidden="true" />
+        ) : (
+          <Copy size={size} aria-hidden="true" />
+        )}
+        {label != null ? <span>{copied ? copiedLabel : label}</span> : null}
+      </button>
+    </AppTooltip>
   );
 };
 

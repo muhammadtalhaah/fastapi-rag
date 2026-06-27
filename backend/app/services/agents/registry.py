@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import logging
 
-from services.agents import rag_agent, web_agent
+from services.agents import general_agent, rag_agent, web_agent
 from services.agents.base import AgentSpec, AgentStream
 
 logger = logging.getLogger(__name__)
@@ -45,3 +45,4 @@ def names() -> list[str]:
 # shipped agents.
 register("rag", rag_agent.stream)
 register("web", web_agent.stream)
+register("general", general_agent.stream)

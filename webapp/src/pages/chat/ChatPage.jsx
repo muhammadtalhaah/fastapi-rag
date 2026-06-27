@@ -1,5 +1,6 @@
 import Composer from "./Composer";
 import MessageTurn from "./MessageTurn";
+import SourcesDrawer from "./SourcesDrawer";
 import { useAuth, useToast } from "@/context";
 import { MessagesSquare } from "lucide-react";
 import { StateBlock } from "@/components/shared";
@@ -7,7 +8,18 @@ import { SUGGESTIONS } from "@/config/dummyData";
 import { useSearchParams } from "react-router-dom";
 import { useChat, useConversations } from "@/hooks";
 import { LoginModal, LoginPrompt } from "@/components/auth";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, memo } from "react";
+
+// Isolated so that opening/closing the drawer doesn't re-render ChatPage or
+// any MessageTurn. The parent passes a stable `openRef` (a ref to a setter)
+// so MessageTurn can trigger the drawer without causing list re-renders.
+const DrawerPortal = memo(({ openRef }) => {
+  const [sources, setSources] = useState(null);
+  // Expose the setter via ref so callers bypass React prop diffing entirely.
+  openRef.current = setSources;
+  return <SourcesDrawer sources={sources} onClose={() => setSources(null)} />;
+});
+DrawerPortal.displayName = "DrawerPortal";
 
 const ChatPage = () => {
   const { isAuthenticated, isLoading: isAuthLoading, oauthError } = useAuth();
@@ -51,6 +63,12 @@ const ChatPage = () => {
     },
     [upsertConversation],
   );
+  // Called synchronously (before React state commits) when the backend mints a
+  // new conversation id. Keeping the ref current here prevents the URL-sync
+  // effect from seeing a stale null and calling loadConversation on the new id.
+  const handleConversationIdReady = useCallback((conversationId) => {
+    activeConversationIdRef.current = conversationId;
+  }, []);
   // A requested conversation that 404s/401s (deleted, or not ours / needs
   // sign-in) can't be opened. Tell the user and drop the dangling ?c= so the
   // URL-sync effect lands them on a fresh chat at the base Ask route.
@@ -62,9 +80,10 @@ const ChatPage = () => {
     messages,
     isAsking,
     isLoadingConversation,
-    connectionState,
-    connectionMessage,
+    socketState,
     activeConversationId,
+    webSearch,
+    setWebSearch,
     send,
     retry,
     newChat,
@@ -74,8 +93,12 @@ const ChatPage = () => {
     onConversationStart: handleConversationStart,
     onConversationTitle: handleConversationTitle,
     onConversationUnavailable: handleConversationUnavailable,
+    onConversationIdReady: handleConversationIdReady,
   });
   const endRef = useRef(null);
+  // Imperative handle to the Composer so we can return focus to its textarea
+  // after a turn finishes streaming or when a fresh chat starts.
+  const composerRef = useRef(null);
   // The DOM node of the message a search result pointed at, so we can scroll to
   // it once the transcript has loaded.
   const highlightRef = useRef(null);
@@ -87,7 +110,9 @@ const ChatPage = () => {
   // message. Parsed once into a number; null when absent/invalid.
   const messageParam = searchParams.get("m");
   const highlightIndex =
-    messageParam != null && /^\d+$/.test(messageParam) ? Number(messageParam) : null;
+    messageParam != null && /^\d+$/.test(messageParam)
+      ? Number(messageParam)
+      : null;
 
   useEffect(() => {
     activeConversationIdRef.current = activeConversationId;
@@ -97,12 +122,18 @@ const ChatPage = () => {
     // Keep the transcript aligned with the URL. A present ?c= opens that
     // conversation; removing ?c= while one is active means the user navigated
     // back to the base Ask route and expects a fresh chat.
-    if (conversationParam && conversationParam !== activeConversationId) {
+    //
+    // Use the ref here (not state) so we compare against the value that was
+    // synchronously written when the conversation was minted — the state update
+    // lags one render behind, which would otherwise make a brand-new ?c= look
+    // like an unknown id and immediately call loadConversation, wiping the
+    // in-progress transcript.
+    if (conversationParam && conversationParam !== activeConversationIdRef.current) {
       loadConversation(conversationParam);
-    } else if (!conversationParam && activeConversationId) {
+    } else if (!conversationParam && activeConversationIdRef.current) {
       newChat();
     }
-  }, [activeConversationId, conversationParam, loadConversation, newChat]);
+  }, [conversationParam, loadConversation, newChat]);
 
   // When a brand-new chat mints its conversation id, reflect it in the URL so a
   // refresh reopens it and the sidebar can highlight it.
@@ -116,6 +147,12 @@ const ChatPage = () => {
   // Login dialog visibility. Chatting is never blocked — the guest prompt is a
   // soft nudge that resurfaces every PROMPTS_PER_NUDGE user prompts.
   const [loginOpen, setLoginOpen] = useState(false);
+  // Ref to DrawerPortal's internal setter — calling it opens the drawer without
+  // touching ChatPage state, so the message list never re-renders on open/close.
+  const drawerOpenRef = useRef(null);
+  const openSources = useCallback((sources) => {
+    drawerOpenRef.current?.(sources);
+  }, []);
   // The user-prompt count at the last dismissal. The nudge reappears once the
   // user has sent another full batch past this baseline; dismissing again moves
   // the baseline forward, so the per-batch counter effectively resets each time.
@@ -155,8 +192,29 @@ const ChatPage = () => {
   }, [highlightIndex, isLoadingConversation, messages.length]);
 
   const isEmpty = messages.length === 0;
-  const isConnecting = connectionState === "connecting" || connectionState === "retrying";
-  const isComposerDisabled = isAsking || isConnecting;
+  const isSocketReady = socketState === "OPEN";
+  const isComposerDisabled = isAsking || !isSocketReady;
+
+  // Return focus to the composer so the user can keep typing without clicking:
+  // when a response finishes streaming (isAsking falls to false) and when a
+  // fresh chat is started (no active conversation). Guarded on the composer
+  // being enabled so we don't focus a disabled input mid-request or while the
+  // socket is still connecting.
+  const wasAskingRef = useRef(false);
+  useEffect(() => {
+    const finishedStreaming = wasAskingRef.current && !isAsking;
+    wasAskingRef.current = isAsking;
+    if (finishedStreaming && isSocketReady) {
+      composerRef.current?.focus();
+    }
+  }, [isAsking, isSocketReady]);
+
+  useEffect(() => {
+    // A new chat (base Ask route, no conversation loaded) lands ready to type.
+    if (!activeConversationId && !isLoadingConversation && isSocketReady) {
+      composerRef.current?.focus();
+    }
+  }, [activeConversationId, isLoadingConversation, isSocketReady]);
   // Show the modal when the user opened it, or when we returned from a failed
   // Google sign-in (derived, so the error surfaces without an effect-driven
   // setState). Closing clears the explicit-open flag; the OAuth error is
@@ -174,7 +232,7 @@ const ChatPage = () => {
     userPromptCount - dismissedAtCount >= PROMPTS_PER_NUDGE;
 
   return (
-    <div className="mx-auto flex w-full min-h-full max-w-4xl flex-1 flex-col px-4 sm_tablet:px-5">
+    <div className="mx-auto flex w-full min-h-full max-w-3xl flex-1 flex-col px-4 sm_tablet:px-5">
       <div
         className={`flex flex-1 flex-col gap-6
         ${isEmpty ? "justify-center" : "justify-start pt-6 sm_tablet:pt-12"}
@@ -213,6 +271,7 @@ const ChatPage = () => {
               onRetry={retry}
               isLast={messages.length - 1 === idx}
               isHighlighted={highlightIndex === idx}
+              onOpenSources={openSources}
             />
           ))
         )}
@@ -220,9 +279,9 @@ const ChatPage = () => {
       </div>
 
       <div className="sticky bottom-0 flex flex-col gap-2 bg-ground pb-2">
-        {connectionMessage ? (
-          <p role="status" aria-live="polite" className="text-center text-xs text-muted">
-            {connectionMessage}
+        {!isSocketReady ? (
+          <p className="text-center text-xs text-muted">
+            {socketState === "CONNECTING" ? "Connecting…" : "Reconnecting…"}
           </p>
         ) : null}
         {showLoginPrompt ? (
@@ -231,13 +290,23 @@ const ChatPage = () => {
             onDismiss={() => setDismissedAtCount(userPromptCount)}
           />
         ) : null}
-        <Composer onSubmit={send} disabled={isComposerDisabled} />
+        <Composer
+          ref={composerRef}
+          onSubmit={send}
+          disabled={isComposerDisabled}
+          webSearch={webSearch}
+          onWebSearchChange={setWebSearch}
+        />
         <p className="text-center text-xs text-ink">
           AI can make mistakes. Verify all information.
         </p>
       </div>
 
-      {showLoginModal ? <LoginModal onClose={() => setLoginOpen(false)} /> : null}
+      {showLoginModal ? (
+        <LoginModal onClose={() => setLoginOpen(false)} />
+      ) : null}
+
+      <DrawerPortal openRef={drawerOpenRef} />
     </div>
   );
 };

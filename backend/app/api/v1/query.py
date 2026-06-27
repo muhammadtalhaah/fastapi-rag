@@ -113,7 +113,7 @@ async def query_documents_stream(body: QueryRequest, request: Request):
         try:
             async for frame in orchestrator_service.run_stream(
                 db, body.question, top_k=body.top_k, mode=body.mode,
-                session=session, client_ip=client_ip,
+                web_search=body.web_search, session=session, client_ip=client_ip,
             ):
                 yield frame
         except ValueError as e:
@@ -160,8 +160,8 @@ async def query_websocket(websocket: WebSocket):
                 continue
 
             logger.info(
-                "[ws-endpoint] Accepted: question=%r top_k=%d mode=%r",
-                body.question[:80], body.top_k, body.mode,
+                "[ws-endpoint] Accepted: question=%r top_k=%d mode=%r web_search=%s",
+                body.question[:80], body.top_k, body.mode, body.web_search,
             )
 
             session_id, session = session_service.get_or_create(body.session_id)
@@ -195,12 +195,13 @@ async def query_websocket(websocket: WebSocket):
 
             captured_sources: list[dict] = []
             answer_parts: list[str] = []
+            captured_model: str | None = None
             client_ip = websocket.client.host if websocket.client else None
 
             try:
                 async for frame in orchestrator_service.run_stream(
                     db, body.question, top_k=body.top_k, mode=body.mode,
-                    session=session, client_ip=client_ip,
+                    web_search=body.web_search, session=session, client_ip=client_ip,
                 ):
                     event_match = None
                     data_match = None
@@ -213,6 +214,8 @@ async def query_websocket(websocket: WebSocket):
                         data_obj = json.loads(data_match)
                         if event_match == "sources":
                             captured_sources = data_obj.get("sources", [])
+                        elif event_match == "model":
+                            captured_model = data_obj.get("name") or None
                         elif event_match == "token":
                             answer_parts.append(data_obj.get("text", ""))
                         await websocket.send_text(json.dumps({"event": event_match, "data": data_obj}))
@@ -232,6 +235,7 @@ async def query_websocket(websocket: WebSocket):
                         body.question,
                         "".join(answer_parts),
                         captured_sources,
+                        captured_model,
                     )
             except ValueError as e:
                 logger.info("[ws-endpoint] User-facing error: %s", e)

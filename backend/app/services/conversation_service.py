@@ -126,17 +126,30 @@ def append_turn(
     question: str,
     answer: str,
     sources: list[dict],
+    model_name: str | None = None,
 ) -> None:
     """Append a completed exchange (question + answer + sources) to a user's
     conversation. Scoped by user_id so one user can't write to another's thread.
+
+    ``model_name`` is the display name of the model that generated ``answer``;
+    stored on the assistant turn so reopened conversations can show which model
+    produced each response. Optional for backward compatibility.
     """
     oid = _oid(conversation_id)
     if not oid:
         return
     now = _now()
+    assistant_turn = {
+        "role": "assistant",
+        "text": answer or "",
+        "sources": sources or [],
+        "created_at": now,
+    }
+    if model_name:
+        assistant_turn["model_name"] = model_name
     turn = [
         {"role": "user", "text": question, "created_at": now},
-        {"role": "assistant", "text": answer or "", "sources": sources or [], "created_at": now},
+        assistant_turn,
     ]
     db.conversations.update_one(
         {"_id": oid, "user_id": user_id},

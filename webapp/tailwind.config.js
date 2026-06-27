@@ -8,6 +8,7 @@ export default {
         // archive theme has a single source of truth in index.css.
         ground: "rgb(var(--ground) / <alpha-value>)",
         surface: "rgb(var(--surface) / <alpha-value>)",
+        elevated: "rgb(var(--elevated) / <alpha-value>)",
         rule: "rgb(var(--rule) / <alpha-value>)",
         ink: "rgb(var(--ink) / <alpha-value>)",
         muted: "rgb(var(--muted) / <alpha-value>)",

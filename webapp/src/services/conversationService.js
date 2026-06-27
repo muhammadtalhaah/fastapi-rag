@@ -27,6 +27,8 @@ function toMessage(raw) {
     status: "done",
     text: raw.text || "",
     sources: (raw.sources || []).map(toSource),
+    // Older messages predate model tracking; null hides the label gracefully.
+    modelName: raw.model_name || null,
     activity: null,
   };
 }

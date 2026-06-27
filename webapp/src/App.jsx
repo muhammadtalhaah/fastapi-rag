@@ -1,10 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "react-router-dom";
-import { useEffect } from "react";
 import { router } from "./routes";
-import { AuthProvider, ThemeProvider, ToastProvider, useAuth } from "@/context";
+import { AntdThemeBridge, AuthProvider, ThemeProvider, ToastProvider, useAuth } from "@/context";
 import { StateBlock } from "@/components/shared";
-import { ensureChatSocket } from "@/services/chatService";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -17,10 +15,6 @@ const queryClient = new QueryClient({
 // a fresh load or refresh. Lives inside AuthProvider so it can read auth state.
 function AuthGate() {
   const { isLoading } = useAuth();
-
-  useEffect(() => {
-    ensureChatSocket().catch(() => {});
-  }, []);
 
   if (isLoading) {
     return (
@@ -39,11 +33,13 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <ToastProvider>
-          <AuthProvider>
-            <AuthGate />
-          </AuthProvider>
-        </ToastProvider>
+        <AntdThemeBridge>
+          <ToastProvider>
+            <AuthProvider>
+              <AuthGate />
+            </AuthProvider>
+          </ToastProvider>
+        </AntdThemeBridge>
       </ThemeProvider>
     </QueryClientProvider>
   );

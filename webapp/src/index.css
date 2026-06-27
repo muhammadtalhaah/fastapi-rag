@@ -13,6 +13,7 @@
   /* Dark — slate-ink ground, paper-white ink, retrieval teal, archival brass. */
   --ground: 20 24 29; /* #14181D */
   --surface: 27 32 39; /* #1B2027 */
+  --elevated: 36 43 52; /* #242B34 — raised above surface, for popovers/cards */
   --rule: 47 55 64; /* #2F3740 */
   --ink: 230 228 221; /* #E6E4DD */
   --muted: 138 146 156; /* #8A929C */
@@ -30,6 +31,7 @@
      designed (not an inversion): teal/brass deepened to read on a paper field. */
   --ground: 244 242 236; /* #F4F2EC — warm paper, not stark white */
   --surface: 252 251 247; /* #FCFBF7 — raised stock, a shade above ground */
+  --elevated: 255 255 255; /* #FFFFFF — top stock, for popovers/cards */
   --rule: 214 209 198; /* #D6D1C6 — warm hairline */
   --ink: 38 43 51; /* #262B33 — slate ink (mirrors the dark ground hue) */
   --muted: 109 114 122; /* #6D727A — mid-grey, AA on paper */

@@ -16,6 +16,7 @@ import { LoginModal } from "@/components/auth";
 import SidebarRecents from "./SidebarRecents";
 import AccountMenu from "./AccountMenu";
 import SearchModal from "./SearchModal";
+import LNG from "@/language";
 
 // Nav reads like a card-catalog index: each entry has a brass call-number, an
 // icon, and a label. Order encodes the natural workflow — ask, browse, add.
@@ -142,7 +143,7 @@ const Sidebar = () => {
           </button>
         </div>
 
-        <nav className="flex flex-col gap-1 p-3" aria-label="Primary">
+        <nav className=" flex flex-col gap-1 p-3 bg-red-" aria-label="Primary">
           {navItems.map(({ to, code, label, icon: Icon, end }) => (
             <NavLink
               key={to}
@@ -197,9 +198,9 @@ const Sidebar = () => {
                 : "opacity-100 delay-150"
             }`}
           >
-            <div className="mt-6 flex items-center justify-between border-t border-rule px-6 py-3">
+            <div className=" flex items-center justify-between border-t border-rule px-6 py-3">
               <p className="whitespace-nowrap font-mono text-[0.6rem] uppercase tracking-[0.3em] text-brass">
-                Recents
+                {LNG.eng.recents}
               </p>
 
               <button

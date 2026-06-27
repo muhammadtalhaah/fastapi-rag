@@ -5,6 +5,7 @@ List / read / delete durable conversations. Writing happens in the query WS flow
 (query.py), not here — these are the read+manage endpoints the sidebar uses.
 """
 import logging
+import time
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pymongo.database import Database
@@ -30,8 +31,11 @@ def get_db() -> Database:
 @router.get("", response_model=list[ConversationSummary])
 def list_conversations(user: dict = Depends(get_current_user)):
     """All of the current user's conversations, newest first (no message bodies)."""
+    t0 = time.perf_counter()
     db = get_db()
-    return conversation_service.list_conversations(db, user["id"])
+    result = conversation_service.list_conversations(db, user["id"])
+    logger.info("GET /conversations completed in %.3fs (%d items)", time.perf_counter() - t0, len(result))
+    return result
 
 
 @router.get("/search", response_model=ConversationSearchResponse)
@@ -54,10 +58,12 @@ def search_conversations(
 @router.get("/{conversation_id}", response_model=ConversationDetail)
 def get_conversation(conversation_id: str, user: dict = Depends(get_current_user)):
     """Full transcript of one conversation. 404 if it isn't the user's."""
+    t0 = time.perf_counter()
     db = get_db()
     convo = conversation_service.get_conversation(db, conversation_id, user["id"])
     if not convo:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
+    logger.info("GET /conversations/%s completed in %.3fs", conversation_id, time.perf_counter() - t0)
     return convo
 
 

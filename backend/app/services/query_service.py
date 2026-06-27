@@ -21,10 +21,22 @@ azure_client = AzureOpenAI(api_key=AZURE_API_KEY, azure_endpoint=AZURE_BASE_URL,
 
 EMBED_MODEL = "voyage-4-large"
 AZURE_DEPLOYMENT = "gpt-5.4"
+# Human-facing label for the generation model, surfaced under each assistant
+# answer and persisted with the message. Kept next to the deployment id so the
+# two move together if the model is ever swapped.
+MODEL_DISPLAY_NAME = "GPT-5.4"
 
 # Retrieval relevance gating (tunable)
-RELEVANCE_FLOOR = 0.5     # discard chunks below this cosine similarity
+RELEVANCE_FLOOR = 0.35    # discard chunks below this cosine similarity
 RELATIVE_GAP = 0.12       # also discard chunks scoring this far below the best match
+# Salvage threshold: if every chunk falls below RELEVANCE_FLOOR but the single
+# best match still clears this lower bar, keep just that one chunk. This stops an
+# on-topic query that phrases the question differently (e.g. "summarize the leave
+# policy" scoring 0.47 vs "tell me about leave policy" scoring 0.55) from
+# silently returning zero context and the model wrongly claiming it has no
+# document. A genuinely off-topic query scores well below this and still yields
+# nothing.
+SALVAGE_FLOOR = 0.30
 
 # Token budgets per RAG cycle (tunable)
 BUDGET_SYSTEM_PROMPT = 1_000
@@ -198,9 +210,16 @@ def _retrieve(db: Database, query_embedding: list[float], top_k: int) -> tuple[l
     best_score = scored[0][0] if scored else 0.0
     cutoff = max(RELEVANCE_FLOOR, best_score - RELATIVE_GAP)
     top_chunks = [(s, c) for s, c in scored[:top_k] if s >= cutoff]
+    # Salvage: if the gate kept nothing but the best match is still plausibly
+    # on-topic, keep that single best chunk rather than answering with no context.
+    salvaged = False
+    if not top_chunks and scored and best_score >= SALVAGE_FLOOR:
+        top_chunks = [scored[0]]
+        salvaged = True
     logger.info(
-        "[retrieve] Scoring done in %.2fs, best=%.4f cutoff=%.4f kept=%d",
+        "[retrieve] Scoring done in %.2fs, best=%.4f cutoff=%.4f kept=%d%s",
         time.perf_counter() - t1, best_score, cutoff, len(top_chunks),
+        " (salvaged best)" if salvaged else "",
     )
 
     doc_ids = {c["document_id"] for _, c in top_chunks}

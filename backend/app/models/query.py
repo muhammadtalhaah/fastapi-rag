@@ -13,6 +13,12 @@ class QueryRequest(BaseModel):
     # the router, so this stays a plain string rather than an enum — it must
     # never reject a request on the routing field alone.
     mode: str = "auto"
+    # Whether the assistant may search the web on this turn. Enabled by default.
+    # When ``False``, auto-routing still picks between ``rag`` and ``general``
+    # but never the ``web`` route (the router downgrades a web pick to the
+    # default route). An explicit ``mode="web"`` override still wins — a manual
+    # route is intentional and not gated by this flag.
+    web_search: bool = True
 
 
 class SourceChunk(BaseModel):

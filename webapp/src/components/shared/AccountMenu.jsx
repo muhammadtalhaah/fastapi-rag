@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Globe, LogOut, Moon, Settings, Sun } from "lucide-react";
+import AppCard from "./AppCard";
 
 // The account control in the sidebar footer. The avatar + name/email row is a
 // button that opens a popover above it (the footer sits at the bottom of the
@@ -63,11 +64,7 @@ const AccountMenu = ({
   return (
     <div ref={containerRef} className="relative">
       {open ? (
-        <div
-          role="menu"
-          aria-label="Account"
-          className="absolute bottom-full left-0 z-50 mb-2 w-60 max-w-[calc(100vw-2rem)] border border-rule bg-surface py-1 shadow-lg"
-        >
+        <AppCard className="w-[16rem] py-1 !-left-3.5 !bottom-11" aria-label="Account">
           {/* Identity header — user image, name, and email. */}
           <div className="flex items-center gap-3 border-b border-rule px-3 py-3">
             <Avatar user={user} />
@@ -110,7 +107,7 @@ const AccountMenu = ({
             <LogOut size={15} aria-hidden="true" className="shrink-0" />
             Logout
           </button>
-        </div>
+        </AppCard>
       ) : null}
 
       {/* Trigger — the avatar + name/email row. */}
@@ -127,8 +124,9 @@ const AccountMenu = ({
         <Avatar user={user} />
         <div className={`min-w-0 flex-1 overflow-hidden ${labelTransition} ${collapsedHide}`}>
           <p className="truncate text-xs font-medium text-ink">{user.name}</p>
-          <p className="truncate font-mono text-[0.6rem] text-muted">{user.email}</p>
+          <p className="truncate font-mono text-[0.6rem] text-muted">Free plan</p>
         </div>
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 256 256" class="flex-shrink-0"><path d="M181.66,170.34a8,8,0,0,1,0,11.32l-48,48a8,8,0,0,1-11.32,0l-48-48a8,8,0,0,1,11.32-11.32L128,212.69l42.34-42.35A8,8,0,0,1,181.66,170.34Zm-96-84.68L128,43.31l42.34,42.35a8,8,0,0,0,11.32-11.32l-48-48a8,8,0,0,0-11.32,0l-48,48A8,8,0,0,0,85.66,85.66Z"></path></svg>
       </button>
     </div>
   );

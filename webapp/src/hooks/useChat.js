@@ -1,7 +1,7 @@
-import { useCallback, useRef, useState } from "react";
-import { askStream, endSession } from "@/services/chatService";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { askStream, endSession, onSocketState } from "@/services/chatService";
 import { getConversation } from "@/services/conversationService";
-import { DEFAULT_TOP_K } from "@/config";
+import { DEFAULT_TOP_K, DEFAULT_WEB_SEARCH } from "@/config";
 
 let nextId = 1;
 const makeId = () => `m${nextId++}`;
@@ -23,31 +23,43 @@ const makeId = () => `m${nextId++}`;
 //   "streaming"  — tokens are arriving (text is built incrementally)
 //   "done"       — complete
 //   "error"      — failed
-// `onConversationUnavailable` is called when a requested conversation can't be
-// opened because it doesn't exist or isn't accessible to the current user
-// (HTTP 404 / 401) — the caller is expected to notify the user and drop the
-// dangling conversation id from the URL.
+//
+// `socketState` mirrors the chatService singleton: "DISCONNECTED" | "CONNECTING" | "OPEN"
+// The composer is disabled while socketState !== "OPEN" or isAsking is true.
 export function useChat({
   onTurnComplete,
   onConversationStart,
   onConversationTitle,
   onConversationUnavailable,
+  onConversationIdReady,
 } = {}) {
   const [messages, setMessages] = useState([]);
   const [isAsking, setIsAsking] = useState(false);
   const [isLoadingConversation, setIsLoadingConversation] = useState(false);
-  const [connectionState, setConnectionState] = useState("idle");
-  const [connectionMessage, setConnectionMessage] = useState("");
+  const [socketState, setSocketState] = useState("CONNECTING");
   const [activeConversationId, setActiveConversationId] = useState(null);
+  // Web search toggle, scoped to the current conversation: on by default for a
+  // fresh chat and reset whenever a new chat starts. A ref mirrors it so `send`
+  // reads the latest value without re-creating the callback each toggle.
+  const [webSearch, setWebSearchState] = useState(DEFAULT_WEB_SEARCH);
+  const webSearchRef = useRef(DEFAULT_WEB_SEARCH);
   const sessionIdRef = useRef(null);
   const conversationIdRef = useRef(null);
-  // Tracks the in-flight conversation-load request so switching conversations
-  // quickly can abort the stale fetch.
   const loadAbortRef = useRef(null);
+
+  const setWebSearch = useCallback((next) => {
+    webSearchRef.current = next;
+    setWebSearchState(next);
+  }, []);
+
+  // Subscribe to the persistent socket's state changes.
+  useEffect(() => {
+    return onSocketState(setSocketState);
+  }, []);
 
   const send = useCallback(async (question) => {
     const trimmed = question.trim();
-    if (!trimmed || isAsking || connectionState === "connecting" || connectionState === "retrying") return;
+    if (!trimmed || isAsking || socketState !== "OPEN") return;
 
     const userMessage = { id: makeId(), role: "user", text: trimmed };
     const pendingId = makeId();
@@ -55,23 +67,23 @@ export function useChat({
     setMessages((prev) => [
       ...prev,
       userMessage,
-      { id: pendingId, role: "assistant", status: "pending", text: "", sources: [], activity: null },
+      { id: pendingId, role: "assistant", status: "pending", text: "", sources: [], activity: null, modelName: null },
     ]);
     setIsAsking(true);
-    setConnectionState("connecting");
 
     const patch = (fields) =>
       setMessages((prev) =>
         prev.map((m) => (m.id === pendingId ? { ...m, ...fields } : m))
       );
 
-    await askStream(trimmed, DEFAULT_TOP_K, sessionIdRef.current, conversationIdRef.current, {
+    await askStream(trimmed, DEFAULT_TOP_K, sessionIdRef.current, conversationIdRef.current, webSearchRef.current, {
       onSession: (sessionId) => {
         sessionIdRef.current = sessionId;
       },
       onConversation: (conversationId) => {
         const isNewConversation = !conversationIdRef.current;
         conversationIdRef.current = conversationId;
+        onConversationIdReady?.(conversationId);
         setActiveConversationId(conversationId);
         if (isNewConversation) {
           onConversationStart?.(conversationId, trimmed);
@@ -83,46 +95,38 @@ export function useChat({
           onConversationTitle?.(conversationIdRef.current, title);
         }
       },
-      onStatus: (stage, message) => {
-        if (stage === "connecting" || stage === "retrying") {
-          setConnectionState(stage);
-          setConnectionMessage(message || "");
-          patch({ status: "pending", activity: message });
-          return;
-        }
-
-        setConnectionState("connected");
-        setConnectionMessage(message || "");
-        patch({ status: "streaming", activity: message });
+      onStatus: (_stage, message) => {
+        patch({ status: "pending", activity: message });
       },
       onSources: (sources) => {
         patch({ sources });
       },
+      onModel: (modelName) => {
+        patch({ modelName });
+      },
       onToken: (text) => {
-        patch({ status: "streaming", activity: null });
+        // Keep `activity` (the last status line, e.g. "Generating answer…")
+        // visible while tokens stream so it stays above the message; it's
+        // cleared on done/error.
         setMessages((prev) =>
           prev.map((m) =>
-            m.id === pendingId ? { ...m, status: "streaming", activity: null, text: m.text + text } : m
+            m.id === pendingId
+              ? { ...m, status: "streaming", text: m.text + text }
+              : m
           )
         );
       },
       onDone: () => {
         patch({ status: "done", activity: null });
         setIsAsking(false);
-        setConnectionState("idle");
-        setConnectionMessage("");
-        // Refresh again after completion so ordering/title updates from the
-        // finished answer are reflected in the sidebar.
         onTurnComplete?.();
       },
       onError: (message) => {
         patch({ status: "error", error: message, activity: null });
         setIsAsking(false);
-        setConnectionState("error");
-        setConnectionMessage(message || "Unable to connect to the chat service.");
       },
     });
-  }, [connectionState, isAsking, onConversationStart, onConversationTitle, onTurnComplete]);
+  }, [isAsking, socketState, onConversationIdReady, onConversationStart, onConversationTitle, onTurnComplete]);
 
   const retry = useCallback(
     (failedId) => {
@@ -130,9 +134,6 @@ export function useChat({
       const userTurn = messages[index - 1];
       const question = userTurn?.text;
       if (!question) return;
-      // The backend only records a turn on success, so a failed turn left the
-      // session untouched — drop the failed exchange from the view and re-ask
-      // against the same session.
       setMessages((prev) =>
         prev.filter((m) => m.id !== failedId && m.id !== userTurn.id),
       );
@@ -141,12 +142,7 @@ export function useChat({
     [messages, send],
   );
 
-  // Close the current conversation and start fresh. Evicts the server context
-  // session and clears the transcript; the next `send` mints a new conversation.
-  // Note: the durable history thread is NOT deleted — it stays in the sidebar.
   const newChat = useCallback(() => {
-    // Cancel any conversation still loading so its result doesn't land on the
-    // fresh chat.
     loadAbortRef.current?.abort();
     loadAbortRef.current = null;
     endSession(sessionIdRef.current);
@@ -155,18 +151,12 @@ export function useChat({
     setActiveConversationId(null);
     setMessages([]);
     setIsAsking(false);
-    setConnectionState("idle");
-    setConnectionMessage("");
+    webSearchRef.current = DEFAULT_WEB_SEARCH;
+    setWebSearchState(DEFAULT_WEB_SEARCH);
   }, []);
 
-  // Load a past conversation into the transcript so the user can continue it.
-  // Resets the in-memory context session (it doesn't survive server restarts and
-  // isn't persisted), but keeps the durable conversation id so new turns append
-  // to the same DB thread.
   const loadConversation = useCallback(async (conversationId) => {
     if (!conversationId || isAsking) return;
-    // Abort a prior in-flight load — switching conversations quickly must not
-    // let an earlier (slower) response overwrite the one the user now wants.
     loadAbortRef.current?.abort();
     const controller = new AbortController();
     loadAbortRef.current = controller;
@@ -180,28 +170,16 @@ export function useChat({
       setActiveConversationId(convo.id);
       setMessages(convo.messages);
       setIsAsking(false);
-      setConnectionState("idle");
-      setConnectionMessage("");
     } catch (error) {
-      // An aborted load was superseded by a newer one — leave the UI to that
-      // request and don't surface an error.
       if (controller.signal.aborted) return;
-      // A missing or inaccessible conversation (deleted, or owned by someone
-      // else / requires sign-in). Reset to a fresh chat and let the caller
-      // notify the user and clear the stale id from the URL, rather than
-      // stranding them on a broken transcript.
       if (error?.status === 404 || error?.status === 401) {
         sessionIdRef.current = null;
         conversationIdRef.current = null;
         setActiveConversationId(null);
         setMessages([]);
-        setConnectionState("idle");
-        setConnectionMessage("");
         onConversationUnavailable?.(conversationId, error.status);
         return;
       }
-      // Any other failure: surface a minimal error turn rather than failing
-      // silently.
       setMessages([
         {
           id: makeId(),
@@ -212,11 +190,7 @@ export function useChat({
           sources: [],
         },
       ]);
-      setConnectionState("error");
-      setConnectionMessage("Couldn't load that conversation.");
     } finally {
-      // Only the current request clears the loading flag; a superseded one must
-      // leave it set for the request that replaced it.
       if (loadAbortRef.current === controller) {
         loadAbortRef.current = null;
         setIsLoadingConversation(false);
@@ -228,9 +202,10 @@ export function useChat({
     messages,
     isAsking,
     isLoadingConversation,
-    connectionState,
-    connectionMessage,
+    socketState,
     activeConversationId,
+    webSearch,
+    setWebSearch,
     send,
     retry,
     newChat,
