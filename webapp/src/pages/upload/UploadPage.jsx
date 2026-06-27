@@ -4,8 +4,7 @@ import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import { PageHeader, AppButton } from "@/components/shared";
 import { ROUTES } from "@/config";
 import { useUpload } from "@/hooks";
-import DropZone from "./DropZone";
-import UploadProgress from "./UploadProgress";
+import { DropZone, UploadProgress } from "@/components/upload";
 
 const UploadPage = () => {
   const navigate = useNavigate();

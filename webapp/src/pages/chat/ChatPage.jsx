@@ -1,6 +1,4 @@
-import Composer from "./Composer";
-import MessageTurn from "./MessageTurn";
-import SourcesDrawer from "./SourcesDrawer";
+import { ChatSkeleton, Composer, MessageTurn, SourcesDrawer } from "@/components/chat";
 import { useAuth, useToast } from "@/context";
 import { MessagesSquare } from "lucide-react";
 import { StateBlock } from "@/components/shared";
@@ -69,13 +67,23 @@ const ChatPage = () => {
   const handleConversationIdReady = useCallback((conversationId) => {
     activeConversationIdRef.current = conversationId;
   }, []);
-  // A requested conversation that 404s/401s (deleted, or not ours / needs
-  // sign-in) can't be opened. Tell the user and drop the dangling ?c= so the
+  // A requested conversation that can't be loaded — deleted/not-ours (404·401)
+  // or a server error (e.g. 502). Tell the user and drop the dangling ?c= so the
   // URL-sync effect lands them on a fresh chat at the base Ask route.
-  const handleConversationUnavailable = useCallback(() => {
-    showToast("Chat not found.");
-    setSearchParams({}, { replace: true });
-  }, [showToast, setSearchParams]);
+  const handleConversationUnavailable = useCallback(
+    (_conversationId, status) => {
+      // 404/401 → the chat is gone or not ours; anything else (e.g. 502) is a
+      // server-side failure. Either way we drop ?c= so the URL-sync effect lands
+      // the user on a fresh chat; the toast explains why.
+      const message =
+        status === 404 || status === 401
+          ? "Chat not found."
+          : "Couldn't load that conversation. Please try again.";
+      showToast(message);
+      setSearchParams({}, { replace: true });
+    },
+    [showToast, setSearchParams],
+  );
   const {
     messages,
     isAsking,
@@ -235,11 +243,11 @@ const ChatPage = () => {
     <div className="mx-auto flex w-full min-h-full max-w-3xl flex-1 flex-col px-4 sm_tablet:px-5">
       <div
         className={`flex flex-1 flex-col gap-6
-        ${isEmpty ? "justify-center" : "justify-start pt-6 sm_tablet:pt-12"}
+        ${isEmpty && !isLoadingConversation ? "justify-center" : "justify-start pt-6 sm_tablet:pt-12"}
         `}
       >
         {isLoadingConversation ? (
-          <></>
+          <ChatSkeleton />
         ) : isEmpty ? (
           <StateBlock
             variant="empty"
@@ -297,7 +305,7 @@ const ChatPage = () => {
           webSearch={webSearch}
           onWebSearchChange={setWebSearch}
         />
-        <p className="text-center text-xs text-ink">
+        <p className="text-center text-xs !text-muted">
           AI can make mistakes. Verify all information.
         </p>
       </div>

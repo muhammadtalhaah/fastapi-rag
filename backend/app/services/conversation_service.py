@@ -206,7 +206,9 @@ def get_conversation(db: Database, conversation_id: str, user_id: str) -> dict |
     oid = _oid(conversation_id)
     if not oid:
         return None
+    t0 = time.perf_counter()
     doc = db.conversations.find_one({"_id": oid, "user_id": user_id})
+    logger.info("[conversation] find_one took %.3fs", time.perf_counter() - t0)
     if not doc:
         return None
     return {

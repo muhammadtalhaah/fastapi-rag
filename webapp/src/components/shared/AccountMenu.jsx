@@ -1,6 +1,7 @@
+import AppCard from "./AppCard";
+import { getInitials } from "@/helpers";
 import { useEffect, useRef, useState } from "react";
 import { Globe, LogOut, Moon, Settings, Sun } from "lucide-react";
-import AppCard from "./AppCard";
 
 // The account control in the sidebar footer. The avatar + name/email row is a
 // button that opens a popover above it (the footer sits at the bottom of the
@@ -19,13 +20,13 @@ const Avatar = ({ user }) =>
     <img
       src={user.profileUrl}
       alt={user.name}
-      className="h-8 w-8 shrink-0 rounded-full object-cover ring-1 ring-rule"
+      className="h-12 w-12 shrink-0 rounded-full object-cover ring-1 ring-rule"
     />
   ) : (
-    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ground ring-1 ring-rule">
-      <span className="font-mono text-xs text-brass">
-        {user.name?.[0]?.toUpperCase() ?? "?"}
-      </span>
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-ground ring-1 ring-rule">
+      <h4 className="font-mono text-base text-brass">
+        {getInitials(user.name)}
+      </h4>
     </div>
   );
 
@@ -122,9 +123,9 @@ const AccountMenu = ({
         }`}
       >
         <Avatar user={user} />
-        <div className={`min-w-0 flex-1 overflow-hidden ${labelTransition} ${collapsedHide}`}>
-          <p className="truncate text-xs font-medium text-ink">{user.name}</p>
-          <p className="truncate font-mono text-[0.6rem] text-muted">Free plan</p>
+        <div className={`min-w-0 flex-1 overflow-hidden space-y-px ${labelTransition} ${collapsedHide}`}>
+          <p className="truncate text-sm font-medium text-ink">{user.name}</p>
+          <p className="truncate text-xs text-muted">Free plan</p>
         </div>
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 256 256" class="flex-shrink-0"><path d="M181.66,170.34a8,8,0,0,1,0,11.32l-48,48a8,8,0,0,1-11.32,0l-48-48a8,8,0,0,1,11.32-11.32L128,212.69l42.34-42.35A8,8,0,0,1,181.66,170.34Zm-96-84.68L128,43.31l42.34,42.35a8,8,0,0,0,11.32-11.32l-48-48a8,8,0,0,0-11.32,0l-48,48A8,8,0,0,0,85.66,85.66Z"></path></svg>
       </button>

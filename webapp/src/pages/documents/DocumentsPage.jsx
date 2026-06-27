@@ -5,8 +5,7 @@ import { PageHeader, StateBlock, AppButton } from "@/components/shared";
 import { ROUTES } from "@/config";
 import { useAuth } from "@/context";
 import { useDocuments } from "@/hooks";
-import DocumentRow from "./DocumentRow";
-import ConfirmDelete from "./ConfirmDelete";
+import { DocumentRow, ConfirmDelete } from "@/components/documents";
 
 const DocumentsPage = () => {
   const navigate = useNavigate();

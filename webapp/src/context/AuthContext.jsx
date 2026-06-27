@@ -9,6 +9,7 @@ import {
 } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { authService } from "@/services";
+import { useToast } from "./ToastContext";
 
 // Human-readable messages for the ?auth_error codes the OAuth callback may
 // append when the Google flow fails (so we never show a raw code to a person).
@@ -27,6 +28,7 @@ export const AUTH_ME_KEY = ["auth", "me"];
 
 export function AuthProvider({ children }) {
   const queryClient = useQueryClient();
+  const { showToast } = useToast();
 
   // On a full-page return from the Google OAuth callback, a successful login
   // already set the session cookie, so the /me query below resolves the user on
@@ -61,6 +63,16 @@ export function AuthProvider({ children }) {
     staleTime: 5 * 60 * 1000,
     retry: false, // a 401 is an answer, not a transient failure
   });
+
+  // Surface a genuine /me failure. A 401/403 is mapped to `null` inside getMe
+  // (anonymous, not an error), so reaching `isError` means a real server/network
+  // fault (e.g. 502) the user should know about. Keyed on the error object so it
+  // toasts once per failure rather than on every render.
+  useEffect(() => {
+    if (meQuery.isError) {
+      showToast("Couldn't reach the server. Please try again.");
+    }
+  }, [meQuery.isError, meQuery.error, showToast]);
 
   const loginMutation = useMutation({
     mutationFn: ({ email, password }) => authService.login(email, password),

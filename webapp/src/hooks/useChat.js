@@ -172,24 +172,15 @@ export function useChat({
       setIsAsking(false);
     } catch (error) {
       if (controller.signal.aborted) return;
-      if (error?.status === 404 || error?.status === 401) {
-        sessionIdRef.current = null;
-        conversationIdRef.current = null;
-        setActiveConversationId(null);
-        setMessages([]);
-        onConversationUnavailable?.(conversationId, error.status);
-        return;
-      }
-      setMessages([
-        {
-          id: makeId(),
-          role: "assistant",
-          status: "error",
-          text: "",
-          error: "Couldn't load that conversation.",
-          sources: [],
-        },
-      ]);
+      // Any load failure (not-found / unauthorized 404·401, or a server error
+      // like 502) is unrecoverable on this route: clear state and let the page
+      // bounce the user back to the index with a toast, rather than stranding
+      // them on a dead conversation with an inline error block.
+      sessionIdRef.current = null;
+      conversationIdRef.current = null;
+      setActiveConversationId(null);
+      setMessages([]);
+      onConversationUnavailable?.(conversationId, error?.status);
     } finally {
       if (loadAbortRef.current === controller) {
         loadAbortRef.current = null;
