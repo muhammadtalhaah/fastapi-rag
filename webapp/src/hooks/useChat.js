@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { askStream, endSession, onSocketState } from "@/services/chatService";
+import { askStream, endSession, onSocketState, stopStream } from "@/services/chatService";
 import { getConversation } from "@/services/conversationService";
 import { DEFAULT_TOP_K, DEFAULT_WEB_SEARCH } from "@/config";
 
@@ -72,6 +72,10 @@ export function useChat({
   const sessionIdRef = useRef(null);
   const conversationIdRef = useRef(null);
   const loadAbortRef = useRef(null);
+  // The id of the assistant message currently streaming, and whether the user
+  // stopped it. `stop` reads these to decide how to settle the partial turn.
+  const pendingIdRef = useRef(null);
+  const stoppedRef = useRef(false);
 
   const setWebSearch = useCallback((next) => {
     webSearchRef.current = next;
@@ -127,6 +131,8 @@ export function useChat({
       ]);
     }
     setIsAsking(true);
+    pendingIdRef.current = pendingId;
+    stoppedRef.current = false;
 
     const patch = (fields) =>
       setMessages((prev) =>
@@ -178,8 +184,36 @@ export function useChat({
         // the active one. The top-level text/sources/modelName already hold the
         // freshly streamed content, so the new version snapshots them; the
         // < n/m > carousel reads from `versions`/`activeVersion`.
-        setMessages((prev) =>
-          prev.map((m) => {
+        //
+        // This path also settles a user-stopped turn (the socket close routes
+        // through onDone): whatever streamed so far is preserved. The one
+        // exception is stopping before any token arrived — committing an empty
+        // version is useless, so we drop a fresh assistant turn (and its user
+        // turn) entirely, or restore a regenerate to its prior version.
+        const wasStopped = stoppedRef.current;
+        setMessages((prev) => {
+          if (wasStopped) {
+            const target = prev.find((m) => m.id === pendingId);
+            const hasPartial = Boolean(target?.text);
+            if (!hasPartial) {
+              if (isRegenerate && target?.versions?.length) {
+                const last = target.versions.length - 1;
+                const v = target.versions[last];
+                return prev.map((m) =>
+                  m.id === pendingId
+                    ? { ...m, status: "done", activity: null, text: v.text, sources: v.sources, modelName: v.modelName, activeVersion: last }
+                    : m,
+                );
+              }
+              // Fresh turn stopped before any text: drop the empty assistant
+              // turn and the user turn that prompted it.
+              const idx = prev.findIndex((m) => m.id === pendingId);
+              const dropIds = new Set([pendingId]);
+              if (idx > 0 && prev[idx - 1]?.role === "user") dropIds.add(prev[idx - 1].id);
+              return prev.filter((m) => !dropIds.has(m.id));
+            }
+          }
+          return prev.map((m) => {
             if (m.id !== pendingId) return m;
             const versions = [
               ...(m.versions || []),
@@ -192,8 +226,9 @@ export function useChat({
               versions,
               activeVersion: versions.length - 1,
             };
-          }),
-        );
+          });
+        });
+        pendingIdRef.current = null;
         setIsAsking(false);
         onTurnComplete?.();
       },
@@ -220,10 +255,20 @@ export function useChat({
             return { ...m, status: "error", error: message, activity: null };
           }),
         );
+        pendingIdRef.current = null;
         setIsAsking(false);
       },
     });
   }, [isAsking, socketState, onConversationIdReady, onConversationStart, onConversationTitle, onTurnComplete]);
+
+  // Stop the in-flight turn. Flags the stop so onDone preserves the partial,
+  // then closes the socket to terminate server-side generation immediately. A
+  // no-op when nothing is streaming.
+  const stop = useCallback(() => {
+    if (!pendingIdRef.current) return;
+    stoppedRef.current = true;
+    stopStream();
+  }, []);
 
   const retry = useCallback(
     (failedId) => {
@@ -302,6 +347,8 @@ export function useChat({
     setActiveConversationId(null);
     setMessages([]);
     setIsAsking(false);
+    pendingIdRef.current = null;
+    stoppedRef.current = false;
     // Keep the user's persisted web-search preference across new chats rather
     // than resetting to the hard default.
     const pref = readWebSearchPref();
@@ -352,6 +399,7 @@ export function useChat({
     webSearch,
     setWebSearch,
     send,
+    stop,
     retry,
     editMessage,
     regenerate,

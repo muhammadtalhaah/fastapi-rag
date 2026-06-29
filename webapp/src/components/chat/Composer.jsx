@@ -1,5 +1,5 @@
 import LNG from "@/language";
-import { ArrowUp } from "lucide-react";
+import { ArrowUp, Square } from "lucide-react";
 import ComposerMenu from "./ComposerMenu";
 import { AppSelect } from "@/components/shared";
 import { DEFAULT_MODEL_ID, MODELS } from "@/config";
@@ -25,7 +25,7 @@ const MODEL_OPTIONS = MODELS.map((m) => ({ value: m.id, label: m.name }));
 // the "+" action menu (web search toggle) on the left and the active model name
 // + send button on the right.
 const Composer = forwardRef(function Composer(
-  { onSubmit, disabled, webSearch, onWebSearchChange },
+  { onSubmit, onStop, isGenerating, disabled, webSearch, onWebSearchChange },
   ref,
 ) {
   const [value, setValue] = useState("");
@@ -117,15 +117,26 @@ const Composer = forwardRef(function Composer(
             aria-label="Select model"
             popupMatchSelectWidth={false}
           />
-          <button
-            type="button"
-            onClick={submit}
-            aria-label="Send question"
-            disabled={disabled || !value.trim()}
-            className="flex p-2 rounded-xl shrink-0 items-center justify-center bg-brass text-ground transition-colors hover:bg-brass/90 disabled:cursor-not-allowed disabled:bg-rule disabled:text-muted"
-          >
-            <ArrowUp size={18} aria-hidden="true" />
-          </button>
+          {isGenerating ? (
+            <button
+              type="button"
+              onClick={onStop}
+              aria-label={LNG.eng.stop}
+              className="flex p-2 rounded-xl shrink-0 items-center justify-center bg-brass text-ground transition-colors hover:bg-brass/90"
+            >
+              <Square size={18} aria-hidden="true" fill="currentColor" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={submit}
+              aria-label="Send question"
+              disabled={disabled || !value.trim()}
+              className="flex p-2 rounded-xl shrink-0 items-center justify-center bg-brass text-ground transition-colors hover:bg-brass/90 disabled:cursor-not-allowed disabled:bg-rule disabled:text-muted"
+            >
+              <ArrowUp size={18} aria-hidden="true" />
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -93,6 +93,7 @@ const ChatPage = () => {
     webSearch,
     setWebSearch,
     send,
+    stop,
     retry,
     editMessage,
     regenerate,
@@ -311,6 +312,8 @@ const ChatPage = () => {
         <Composer
           ref={composerRef}
           onSubmit={send}
+          onStop={stop}
+          isGenerating={isAsking}
           disabled={isComposerDisabled}
           webSearch={webSearch}
           onWebSearchChange={setWebSearch}

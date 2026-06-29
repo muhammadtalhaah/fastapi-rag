@@ -83,7 +83,7 @@ function connect() {
   };
 
   socket.onmessage = (evt) => {
-    if (!activeHandlers) return;
+    if (!activeHandlers || activeHandlers.aborted) return;
     let msg;
     try {
       msg = JSON.parse(evt.data);
@@ -115,11 +115,18 @@ function connect() {
     if (ws === socket) ws = null;
     wsState = "DISCONNECTED";
     notifyState();
-    // If a turn was in flight, surface the error before reconnecting.
+    // If a turn was in flight, settle it before reconnecting. An intentional
+    // stop (the user clicked Stop, which closes the socket to kill server-side
+    // generation) is committed as a normal completion so the partial text is
+    // preserved; any other mid-turn close is a genuine connection loss.
     if (activeHandlers) {
       const h = activeHandlers;
       activeHandlers = null;
-      h.onError?.("Connection lost. Please try again.");
+      if (h.aborted) {
+        h.onDone?.();
+      } else {
+        h.onError?.("Connection lost. Please try again.");
+      }
       h.resolve?.();
     }
     scheduleReconnect();
@@ -136,6 +143,23 @@ connect();
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
+
+// Stop the in-flight turn immediately. Because the backend processes one
+// message per connection inside a blocking stream loop, it can't read a "stop"
+// control frame mid-turn — so we close the socket, which raises a disconnect on
+// the server and tears down its generator (terminating LLM generation). The
+// handler is flagged `aborted` first so onclose commits the partial answer as a
+// normal completion instead of surfacing a "connection lost" error. The
+// background reconnect loop (scheduled by onclose) restores the socket.
+export function stopStream() {
+  if (!activeHandlers || activeHandlers.aborted) return;
+  activeHandlers.aborted = true;
+  try {
+    ws?.close();
+  } catch {
+    // If close throws (already closing), onclose still fires and settles it.
+  }
+}
 
 export function endSession(sessionId) {
   if (!sessionId) return;

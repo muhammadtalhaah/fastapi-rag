@@ -17,6 +17,7 @@ const LNG = {
     editMessage: "Edit message",
     showMore: "Show more",
     showLess: "Show less",
+    stop: "Stop generating",
   },
 };
 

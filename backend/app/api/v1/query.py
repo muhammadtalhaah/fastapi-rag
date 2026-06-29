@@ -220,6 +220,41 @@ async def query_websocket(websocket: WebSocket):
             captured_model: str | None = None
             client_ip = websocket.client.host if websocket.client else None
 
+            def persist_turn():
+                """Commit the (possibly partial) answer to durable history. Used
+                on normal completion and when the client stops mid-stream — in
+                both cases whatever streamed so far is what we keep, so reopening
+                the conversation shows the partial answer instead of nothing."""
+                if not (user and conversation_id):
+                    return
+                answer = "".join(answer_parts)
+                # Stopped before any text streamed: nothing worth storing. For a
+                # fresh turn, skip so we don't persist an empty exchange; a
+                # regenerate likewise keeps its existing latest version untouched.
+                if not answer:
+                    return
+                if not requested_conversation_id:
+                    conversation_service.rename_conversation(
+                        db,
+                        conversation_id,
+                        user["id"],
+                        conversation_service.generate_title(body.question, answer),
+                    )
+                # A regeneration replaces the last answer in place (a new version
+                # in its carousel); fall back to appending if the last turn no
+                # longer matches (e.g. a stale client).
+                regenerated = False
+                if is_regenerate:
+                    regenerated = conversation_service.regenerate_last_turn(
+                        db, conversation_id, user["id"], body.question,
+                        answer, captured_sources, captured_model,
+                    )
+                if not regenerated:
+                    conversation_service.append_turn(
+                        db, conversation_id, user["id"], body.question,
+                        answer, captured_sources, captured_model,
+                    )
+
             try:
                 async for frame in orchestrator_service.run_stream(
                     db, body.question, top_k=body.top_k, mode=body.mode,
@@ -242,44 +277,20 @@ async def query_websocket(websocket: WebSocket):
                             answer_parts.append(data_obj.get("text", ""))
                         await websocket.send_text(json.dumps({"event": event_match, "data": data_obj}))
 
-                if user and conversation_id:
-                    if not requested_conversation_id:
-                        conversation_service.rename_conversation(
-                            db,
-                            conversation_id,
-                            user["id"],
-                            conversation_service.generate_title(body.question, "".join(answer_parts)),
-                        )
-                    # A regeneration replaces the last answer in place (a new
-                    # version in its carousel); fall back to appending if the
-                    # last turn no longer matches (e.g. a stale client).
-                    regenerated = False
-                    if is_regenerate:
-                        regenerated = conversation_service.regenerate_last_turn(
-                            db,
-                            conversation_id,
-                            user["id"],
-                            body.question,
-                            "".join(answer_parts),
-                            captured_sources,
-                            captured_model,
-                        )
-                    if not regenerated:
-                        conversation_service.append_turn(
-                            db,
-                            conversation_id,
-                            user["id"],
-                            body.question,
-                            "".join(answer_parts),
-                            captured_sources,
-                            captured_model,
-                        )
+                persist_turn()
+            except WebSocketDisconnect:
+                # The client closed the socket mid-stream — this is how a "Stop"
+                # is signalled (the persistent socket can't carry a control frame
+                # while this loop is blocking). Breaking the async-for tears down
+                # the orchestrator generator (GeneratorExit), terminating LLM
+                # generation; we persist whatever streamed so the partial answer
+                # survives, then exit the connection (it auto-reconnects client-side).
+                logger.info("[ws-endpoint] Client disconnected mid-turn; persisting partial answer")
+                persist_turn()
+                break
             except ValueError as e:
                 logger.info("[ws-endpoint] User-facing error: %s", e)
                 await websocket.send_text(json.dumps({"event": "error", "data": {"message": str(e)}}))
-            except WebSocketDisconnect:
-                logger.info("[ws-endpoint] Client disconnected")
-                break
             except Exception:
                 logger.exception("[ws-endpoint] Unhandled error")
                 await websocket.send_text(json.dumps({"event": "error", "data": {"message": GENERIC_ERROR}}))
