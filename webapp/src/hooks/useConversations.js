@@ -41,6 +41,15 @@ export function useConversations() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: CONVERSATIONS_KEY }),
   });
 
+  // Bulk delete for the Chats manager's "Select chats" mode. There's no batch
+  // endpoint, so fan out the existing per-id delete and refetch once after all
+  // settle. allSettled (not all) so one failed row doesn't abort the rest.
+  const bulkDeletion = useMutation({
+    mutationFn: (ids) =>
+      Promise.allSettled(ids.map(conversationService.deleteConversation)),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: CONVERSATIONS_KEY }),
+  });
+
   const setConversations = (updater) => {
     queryClient.setQueryData(CONVERSATIONS_KEY, (current) => {
       const list = Array.isArray(current) ? current : [];
@@ -126,5 +135,7 @@ export function useConversations() {
     pinningId: setPinned.isPending ? setPinned.variables?.id : null,
     deleteConversation: deletion.mutate,
     deletingId: deletion.isPending ? deletion.variables : null,
+    deleteConversations: bulkDeletion.mutate,
+    isBulkDeleting: bulkDeletion.isPending,
   };
 }

@@ -8,6 +8,7 @@ import { createBrowserRouter, Navigate } from "react-router-dom";
 
 // Route-level code splitting: each page is its own chunk.
 const ChatPage = lazy(() => import("@/pages/chat"));
+const ChatsPage = lazy(() => import("@/pages/chats"));
 const DocumentsPage = lazy(() => import("@/pages/documents"));
 const UploadPage = lazy(() => import("@/pages/upload"));
 
@@ -32,6 +33,10 @@ export const router = createBrowserRouter([
     errorElement: <RouteError />,
     children: [
       { index: true, element: withSuspense(ChatPage) },
+      {
+        path: ROUTES.CHATS,
+        element: <RequireAuth>{withSuspense(ChatsPage)}</RequireAuth>,
+      },
       {
         path: ROUTES.UPLOAD,
         element: <RequireAuth>{withSuspense(UploadPage)}</RequireAuth>,

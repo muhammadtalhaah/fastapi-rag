@@ -6,6 +6,7 @@ import {
   UploadCloud,
   PanelLeftOpen,
   MessagesSquare,
+  MessageSquareText,
   PanelLeftClose,
 } from "lucide-react";
 import LNG from "@/language";
@@ -23,8 +24,9 @@ import { useAuth, useLayout, useThemeContext } from "@/context";
 // `authOnly` entries are hidden from guests (uploading requires signing in).
 const NAV = [
   { to: ROUTES.CHAT, code: "01", label: "Ask", icon: MessagesSquare, end: true },
-  { to: ROUTES.DOCUMENTS, code: "02", label: "Documents", icon: Library },
-  { to: ROUTES.UPLOAD, code: "03", label: "Upload", icon: UploadCloud, authOnly: true },
+  { to: ROUTES.CHATS, code: "02", label: "Chats", icon: MessageSquareText, authOnly: true },
+  { to: ROUTES.DOCUMENTS, code: "03", label: "Documents", icon: Library },
+  { to: ROUTES.UPLOAD, code: "04", label: "Upload", icon: UploadCloud, authOnly: true },
 ];
 
 // The catalog rail. One component, two responsive personalities driven by
