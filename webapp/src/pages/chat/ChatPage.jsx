@@ -4,7 +4,7 @@ import { MessagesSquare } from "lucide-react";
 import { StateBlock } from "@/components/shared";
 import { SUGGESTIONS } from "@/config/dummyData";
 import { useSearchParams } from "react-router-dom";
-import { useChat, useConversations } from "@/hooks";
+import { useChat, useConversations, useScrollToBottom } from "@/hooks";
 import { LoginModal, LoginPrompt } from "@/components/auth";
 import { useCallback, useEffect, useRef, useState, memo } from "react";
 
@@ -104,6 +104,9 @@ const ChatPage = () => {
     onConversationIdReady: handleConversationIdReady,
   });
   const endRef = useRef(null);
+  // Keeps the conversation viewport pinned to its true bottom, re-pinning as
+  // async content (markdown, code blocks, images, the sources ledger) settles.
+  const scrollToBottom = useScrollToBottom(endRef);
   // Imperative handle to the Composer so we can return focus to its textarea
   // after a turn finishes streaming or when a fresh chat starts.
   const composerRef = useRef(null);
@@ -167,17 +170,16 @@ const ChatPage = () => {
   const [dismissedAtCount, setDismissedAtCount] = useState(0);
 
   // Keep the newest turn in view as the transcript grows. On a freshly loaded
-  // conversation jump instantly to the bottom (no visible scroll-through);
-  // while chatting, follow new tokens smoothly. Suppressed while a search-result
-  // highlight is pending, so we don't yank the user to the bottom instead of the
-  // message they searched for.
+  // conversation jump instantly to the true bottom (scrollToBottom re-pins
+  // across frames so async content — markdown, code, images, the sources ledger
+  // — can't strand the viewport partway down); while chatting, follow new
+  // tokens smoothly. Suppressed while a search-result highlight is pending, so
+  // we don't yank the user to the bottom instead of the message they searched
+  // for, and while still loading so we wait until messages have rendered.
   useEffect(() => {
     if (isLoadingConversation || highlightIndex != null) return;
-    endRef.current?.scrollIntoView({
-      behavior: isAsking ? "smooth" : "auto",
-      block: "end",
-    });
-  }, [messages, isAsking, isLoadingConversation, highlightIndex]);
+    scrollToBottom(isAsking ? "smooth" : "auto");
+  }, [messages, isAsking, isLoadingConversation, highlightIndex, scrollToBottom]);
 
   // Arriving from a search result: once the targeted conversation has finished
   // loading and the message exists, scroll it into view, then drop ?m= so the

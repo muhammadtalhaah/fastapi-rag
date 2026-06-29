@@ -2,11 +2,11 @@
 Authentication & session configuration.
 
 Flat module-level constants loaded from environment variables / the project
-``.env`` file. The ``settings`` namespace object at the bottom exposes every
-constant as an attribute so all existing ``settings.<attr>`` call-sites continue
-to work without modification.
+``.env`` file. ``settings`` is a SimpleNamespace that exposes every constant
+as an attribute so all ``settings.<attr>`` call-sites work without modification.
 """
 import os
+import types
 from pathlib import Path
 from typing import Literal
 
@@ -124,39 +124,34 @@ def google_enabled() -> bool:
 # ---------------------------------------------------------------------------
 # Compatibility namespace — ``from config import settings; settings.foo``
 # keeps working everywhere without touching callers.
+# google_enabled is stored as the evaluated bool so ``settings.google_enabled``
+# (no call parens) works identically to the former @property.
 # ---------------------------------------------------------------------------
 
-class _Settings:
-    """Read-only attribute view over this module's constants."""
-
-    session_cookie_name = session_cookie_name
-    csrf_cookie_name = csrf_cookie_name
-    session_ttl_seconds = session_ttl_seconds
-    session_sliding = session_sliding
-    cookie_secure = cookie_secure
-    cookie_samesite = cookie_samesite
-    cookie_domain = cookie_domain
-    cookie_path = cookie_path
-    login_max_attempts = login_max_attempts
-    login_lockout_seconds = login_lockout_seconds
-    login_attempt_ttl_seconds = login_attempt_ttl_seconds
-    bind_session_to_user_agent = bind_session_to_user_agent
-    bind_session_to_ip = bind_session_to_ip
-    cors_allowed_origins = cors_allowed_origins
-    password_min_length = password_min_length
-    password_max_length = password_max_length
-    google_client_id = google_client_id
-    google_client_secret = google_client_secret
-    google_redirect_uri = google_redirect_uri
-    oauth_post_login_redirect = oauth_post_login_redirect
-    oauth_state_secret = oauth_state_secret
-
-    @property
-    def google_enabled(self) -> bool:
-        return google_enabled()
-
-
-settings = _Settings()
+settings = types.SimpleNamespace(
+    session_cookie_name=session_cookie_name,
+    csrf_cookie_name=csrf_cookie_name,
+    session_ttl_seconds=session_ttl_seconds,
+    session_sliding=session_sliding,
+    cookie_secure=cookie_secure,
+    cookie_samesite=cookie_samesite,
+    cookie_domain=cookie_domain,
+    cookie_path=cookie_path,
+    login_max_attempts=login_max_attempts,
+    login_lockout_seconds=login_lockout_seconds,
+    login_attempt_ttl_seconds=login_attempt_ttl_seconds,
+    bind_session_to_user_agent=bind_session_to_user_agent,
+    bind_session_to_ip=bind_session_to_ip,
+    cors_allowed_origins=cors_allowed_origins,
+    password_min_length=password_min_length,
+    password_max_length=password_max_length,
+    google_client_id=google_client_id,
+    google_client_secret=google_client_secret,
+    google_redirect_uri=google_redirect_uri,
+    oauth_post_login_redirect=oauth_post_login_redirect,
+    oauth_state_secret=oauth_state_secret,
+    google_enabled=google_enabled(),
+)
 
 # Kept for the ``from config.settings import AuthSettings`` import in __init__.py.
-AuthSettings = _Settings
+AuthSettings = type(settings)

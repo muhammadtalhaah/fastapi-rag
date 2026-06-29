@@ -7,3 +7,4 @@ export { useDebounce } from "./useDebounce";
 export { useMediaQuery } from "./useMediaQuery";
 export { useCopyToClipboard } from "./useCopyToClipboard";
 export { useTheme } from "./useTheme";
+export { useScrollToBottom } from "./useScrollToBottom";

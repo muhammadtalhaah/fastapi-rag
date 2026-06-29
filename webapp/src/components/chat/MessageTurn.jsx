@@ -58,7 +58,14 @@ FaviconStack.displayName = "FaviconStack";
 
 // ─── Markdown body ─────────────────────────────────────────────────────────────
 
+// Resting gap below the last (completed) message so it isn't flush with the
+// composer. While the assistant is actively streaming we balloon this to ~half
+// the viewport so the growing response stays comfortably centered instead of
+// hugging the bottom edge; it collapses back the moment the turn completes.
+// `transition-[margin]` keeps that collapse smooth rather than a hard jump.
 const BOTTOM_MARGIN = "mb-40";
+const STREAMING_BOTTOM_MARGIN = "mb-[50vh]";
+const BOTTOM_MARGIN_TRANSITION = "transition-[margin] duration-300 ease-out motion-reduce:transition-none";
 
 const MarkdownBody = memo(
   ({ text, sources, isLast, status, modelName, onOpenSources }) => {
@@ -70,8 +77,14 @@ const MarkdownBody = memo(
       [onOpenSources, sources],
     );
 
+    // Only the last message carries bottom spacing; while it's streaming the
+    // gap grows to keep the live content centered, then collapses on "done".
+    const bottomMargin = isLast
+      ? `${status === "streaming" ? STREAMING_BOTTOM_MARGIN : BOTTOM_MARGIN} ${BOTTOM_MARGIN_TRANSITION}`
+      : "";
+
     return (
-      <div className={`mt-2 text-[0.95rem] ${isLast ? BOTTOM_MARGIN : ""}`}>
+      <div className={`mt-2 text-[0.95rem] ${bottomMargin}`}>
         <MarkdownRenderer text={text} onCite={(n) => onCiteRef.current(n)} />
         {status === "streaming" ? (
           <span className="ml-1 inline-block h-2 w-2 animate-pulse rounded-full bg-brass align-middle" />

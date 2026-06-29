@@ -65,27 +65,49 @@ const AccountMenu = ({
   return (
     <div ref={containerRef} className="relative">
       {open ? (
-        <AppCard className="w-[16rem] py-1 !-left-3.5 !bottom-11" aria-label="Account">
+        <AppCard
+          className="w-[16rem] py-1 !-left-3.5 !bottom-11"
+          aria-label="Account"
+        >
           {/* Identity header — user image, name, and email. */}
           <div className="flex items-center gap-3 border-b border-rule px-3 py-3">
             <Avatar user={user} />
             <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-medium text-ink">{user.name}</p>
-              <p className="truncate font-mono text-[0.6rem] text-muted">{user.email}</p>
+              <p className="truncate text-xs font-medium text-ink">
+                {user.name}
+              </p>
+              <p className="truncate font-mono text-[0.6rem] text-muted">
+                {user.email}
+              </p>
             </div>
           </div>
 
-          <button type="button" role="menuitem" className={itemClass} onClick={() => setOpen(false)}>
+          <button
+            type="button"
+            role="menuitem"
+            className={itemClass}
+            onClick={() => setOpen(false)}
+          >
             <Settings size={15} aria-hidden="true" className="shrink-0" />
             Settings
           </button>
-          <button type="button" role="menuitem" className={itemClass} onClick={() => setOpen(false)}>
+          <button
+            type="button"
+            role="menuitem"
+            className={itemClass}
+            onClick={() => setOpen(false)}
+          >
             <Globe size={15} aria-hidden="true" className="shrink-0" />
             Language
           </button>
 
           {/* Theme toggle. Stays open so the user can see the flip / toggle back. */}
-          <button type="button" role="menuitem" className={itemClass} onClick={onToggleTheme}>
+          <button
+            type="button"
+            role="menuitem"
+            className={itemClass}
+            onClick={onToggleTheme}
+          >
             {theme === "dark" ? (
               <Sun size={15} aria-hidden="true" className="shrink-0" />
             ) : (
@@ -123,11 +145,24 @@ const AccountMenu = ({
         }`}
       >
         <Avatar user={user} />
-        <div className={`min-w-0 flex-1 overflow-hidden space-y-px ${labelTransition} ${collapsedHide}`}>
+        <div
+          className={`min-w-0 flex-1 overflow-hidden space-y-px ${labelTransition} ${collapsedHide}`}
+        >
           <p className="truncate text-sm font-medium text-ink">{user.name}</p>
           <p className="truncate text-xs text-muted">Free plan</p>
         </div>
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 256 256" class="flex-shrink-0"><path d="M181.66,170.34a8,8,0,0,1,0,11.32l-48,48a8,8,0,0,1-11.32,0l-48-48a8,8,0,0,1,11.32-11.32L128,212.69l42.34-42.35A8,8,0,0,1,181.66,170.34Zm-96-84.68L128,43.31l42.34,42.35a8,8,0,0,0,11.32-11.32l-48-48a8,8,0,0,0-11.32,0l-48,48A8,8,0,0,0,85.66,85.66Z"></path></svg>
+        {!collapsed && (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            fill="currentColor"
+            viewBox="0 0 256 256"
+            class="flex-shrink-0"
+          >
+            <path d="M181.66,170.34a8,8,0,0,1,0,11.32l-48,48a8,8,0,0,1-11.32,0l-48-48a8,8,0,0,1,11.32-11.32L128,212.69l42.34-42.35A8,8,0,0,1,181.66,170.34Zm-96-84.68L128,43.31l42.34,42.35a8,8,0,0,0,11.32-11.32l-48-48a8,8,0,0,0-11.32,0l-48,48A8,8,0,0,0,85.66,85.66Z"></path>
+          </svg>
+        )}
       </button>
     </div>
   );

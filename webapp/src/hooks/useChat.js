@@ -6,6 +6,32 @@ import { DEFAULT_TOP_K, DEFAULT_WEB_SEARCH } from "@/config";
 let nextId = 1;
 const makeId = () => `m${nextId++}`;
 
+// Persisted web-search preference. The toggle is a user preference (like theme),
+// so it survives refreshes and seeds the default for new chats. Read/write are
+// best-effort: storage may be unavailable (privacy mode / SSR).
+const WEB_SEARCH_STORAGE_KEY = "athenaeum-web-search";
+
+const readWebSearchPref = () => {
+  if (typeof window === "undefined") return DEFAULT_WEB_SEARCH;
+  try {
+    const saved = window.localStorage.getItem(WEB_SEARCH_STORAGE_KEY);
+    if (saved === "true") return true;
+    if (saved === "false") return false;
+    return DEFAULT_WEB_SEARCH;
+  } catch {
+    return DEFAULT_WEB_SEARCH;
+  }
+};
+
+const persistWebSearchPref = (value) => {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(WEB_SEARCH_STORAGE_KEY, value ? "true" : "false");
+  } catch {
+    // Persistence is best-effort; ignore storage failures.
+  }
+};
+
 // Owns the conversation transcript for display. Two server-side ids are tracked:
 //
 //   sessionIdRef       — the in-memory LLM *context* id (rolling summary + recent
@@ -38,11 +64,11 @@ export function useChat({
   const [isLoadingConversation, setIsLoadingConversation] = useState(false);
   const [socketState, setSocketState] = useState("CONNECTING");
   const [activeConversationId, setActiveConversationId] = useState(null);
-  // Web search toggle, scoped to the current conversation: on by default for a
-  // fresh chat and reset whenever a new chat starts. A ref mirrors it so `send`
+  // Web search toggle, persisted as a user preference so it survives page
+  // refreshes and seeds the default for new chats. A ref mirrors it so `send`
   // reads the latest value without re-creating the callback each toggle.
-  const [webSearch, setWebSearchState] = useState(DEFAULT_WEB_SEARCH);
-  const webSearchRef = useRef(DEFAULT_WEB_SEARCH);
+  const [webSearch, setWebSearchState] = useState(readWebSearchPref);
+  const webSearchRef = useRef(webSearch);
   const sessionIdRef = useRef(null);
   const conversationIdRef = useRef(null);
   const loadAbortRef = useRef(null);
@@ -50,6 +76,7 @@ export function useChat({
   const setWebSearch = useCallback((next) => {
     webSearchRef.current = next;
     setWebSearchState(next);
+    persistWebSearchPref(next);
   }, []);
 
   // Subscribe to the persistent socket's state changes.
@@ -151,8 +178,11 @@ export function useChat({
     setActiveConversationId(null);
     setMessages([]);
     setIsAsking(false);
-    webSearchRef.current = DEFAULT_WEB_SEARCH;
-    setWebSearchState(DEFAULT_WEB_SEARCH);
+    // Keep the user's persisted web-search preference across new chats rather
+    // than resetting to the hard default.
+    const pref = readWebSearchPref();
+    webSearchRef.current = pref;
+    setWebSearchState(pref);
   }, []);
 
   const loadConversation = useCallback(async (conversationId) => {

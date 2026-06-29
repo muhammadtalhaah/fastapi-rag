@@ -16,18 +16,19 @@ Design notes (consistent with the rest of the codebase):
   - The stored `_id` (ObjectId) is the conversation id; we expose it as a string.
   - Only authenticated users get persistence; guest turns never reach here.
 """
-import logging
 import re
-from datetime import datetime, timezone
+import time
+import logging
 import asyncio
 from typing import AsyncIterator
+from datetime import datetime, timezone
 
 from bson import ObjectId
-from bson.errors import InvalidId
 from openai import AzureOpenAI
-from pymongo import DESCENDING, ReturnDocument
+from bson.errors import InvalidId
 from pymongo.database import Database
 from pymongo.errors import OperationFailure
+from pymongo import DESCENDING, ReturnDocument
 
 from config import AZURE_API_KEY, AZURE_BASE_URL
 

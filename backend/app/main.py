@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from api.v1 import router as v1_router
 from config import settings
 from config.api_keys import DEBUG, LOG_LEVEL
+from typing import cast, Literal
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -22,7 +23,7 @@ app = FastAPI(lifespan=lifespan)
 app.add_middleware(
     SessionMiddleware,
     secret_key=settings.oauth_state_secret,
-    same_site=settings.cookie_samesite,
+    same_site=cast(Literal["lax", "strict", "none"], settings.cookie_samesite),
     https_only=settings.cookie_secure,
 )
 
