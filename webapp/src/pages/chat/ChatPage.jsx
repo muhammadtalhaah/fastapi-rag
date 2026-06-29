@@ -94,6 +94,9 @@ const ChatPage = () => {
     setWebSearch,
     send,
     retry,
+    editMessage,
+    regenerate,
+    setActiveVersion,
     newChat,
     loadConversation,
   } = useChat({
@@ -279,6 +282,11 @@ const ChatPage = () => {
               ref={highlightIndex === idx ? highlightRef : null}
               message={message}
               onRetry={retry}
+              onRegenerate={regenerate}
+              onSelectVersion={setActiveVersion}
+              onEditMessage={editMessage}
+              isAuthenticated={isAuthenticated}
+              canRegenerate={!isComposerDisabled}
               isLast={messages.length - 1 === idx}
               isHighlighted={highlightIndex === idx}
               onOpenSources={openSources}

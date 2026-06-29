@@ -24,9 +24,7 @@ const Avatar = ({ user }) =>
     />
   ) : (
     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-ground ring-1 ring-rule">
-      <h4 className="font-mono text-base text-brass">
-        {getInitials(user.name)}
-      </h4>
+      <h4 className="font-mono text-base text-brass">{getInitials(user.name)}</h4>
     </div>
   );
 
@@ -60,25 +58,22 @@ const AccountMenu = ({
   }, [open]);
 
   const itemClass =
-    "flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-muted transition-colors hover:bg-ground hover:text-ink";
+    "flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-muted transition-colors";
 
   return (
-    <div ref={containerRef} className="relative">
+    <div
+      ref={containerRef}
+      onClick={() => setOpen((prev) => !prev)}
+      className={`relative p-4 hover:bg-ground cursor-pointer ${open ? "bg-ground" : "bg-transparent"}`}
+    >
       {open ? (
-        <AppCard
-          className="w-[16rem] py-1 !-left-3.5 !bottom-11"
-          aria-label="Account"
-        >
+        <AppCard className="w-[16rem] py-1 !-left-0 !bottom-13" aria-label="Account">
           {/* Identity header — user image, name, and email. */}
           <div className="flex items-center gap-3 border-b border-rule px-3 py-3">
             <Avatar user={user} />
             <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-medium text-ink">
-                {user.name}
-              </p>
-              <p className="truncate font-mono text-[0.6rem] text-muted">
-                {user.email}
-              </p>
+              <p className="truncate text-xs font-medium text-ink">{user.name}</p>
+              <p className="truncate font-mono text-[0.6rem] text-muted">{user.email}</p>
             </div>
           </div>
 
@@ -136,11 +131,10 @@ const AccountMenu = ({
       {/* Trigger — the avatar + name/email row. */}
       <button
         type="button"
-        onClick={() => setOpen((prev) => !prev)}
         aria-haspopup="menu"
         aria-expanded={open}
         title={collapsed ? user.name : undefined}
-        className={`flex w-full items-center gap-3 text-left transition-colors hover:opacity-90 ${
+        className={`flex w-full items-center gap-3 text-left transition-colors ${
           collapsed ? "sm_tablet:justify-center sm_tablet:gap-0" : ""
         }`}
       >
@@ -148,7 +142,9 @@ const AccountMenu = ({
         <div
           className={`min-w-0 flex-1 overflow-hidden space-y-px ${labelTransition} ${collapsedHide}`}
         >
-          <p className="truncate text-sm font-medium text-ink">{user.name}</p>
+          <p className="truncate text-sm font-normal font-[Inter] text-ink">
+            {user.name}
+          </p>
           <p className="truncate text-xs text-muted">Free plan</p>
         </div>
         {!collapsed && (

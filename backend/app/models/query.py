@@ -19,6 +19,12 @@ class QueryRequest(BaseModel):
     # default route). An explicit ``mode="web"`` override still wins — a manual
     # route is intentional and not gated by this flag.
     web_search: bool = True
+    # When ``True``, this turn is a *regeneration* of the conversation's last
+    # answer rather than a new question. For logged-in users the backend then
+    # appends a new answer *version* to the last assistant turn (replacing it as
+    # the active answer) instead of appending a fresh user + assistant exchange.
+    # Ignored for guests (no durable history). See conversation_service.
+    regenerate: bool = False
 
 
 class SourceChunk(BaseModel):

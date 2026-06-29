@@ -140,11 +140,23 @@ def append_turn(
     if not oid:
         return
     now = _now()
+    # The first (and, until regenerated, only) answer version. The top-level
+    # text/sources/model_name mirror the active version so existing readers
+    # (search, snippet extraction, older clients) keep working unchanged.
+    version = {
+        "text": answer or "",
+        "sources": sources or [],
+        "created_at": now,
+    }
+    if model_name:
+        version["model_name"] = model_name
     assistant_turn = {
         "role": "assistant",
         "text": answer or "",
         "sources": sources or [],
         "created_at": now,
+        "versions": [version],
+        "active_version": 0,
     }
     if model_name:
         assistant_turn["model_name"] = model_name
@@ -156,6 +168,90 @@ def append_turn(
         {"_id": oid, "user_id": user_id},
         {"$push": {"messages": {"$each": turn}}, "$set": {"updated_at": now}},
     )
+
+
+def regenerate_last_turn(
+    db: Database,
+    conversation_id: str,
+    user_id: str,
+    question: str,
+    answer: str,
+    sources: list[dict],
+    model_name: str | None = None,
+) -> bool:
+    """Append a new answer *version* to the conversation's last assistant turn and
+    make it the active answer — the persistence side of the "Try again" carousel.
+
+    Unlike :func:`append_turn`, this does NOT add a new user/assistant exchange:
+    it replaces the last answer in place while keeping prior versions, so reopening
+    the conversation restores the full ``< n/m >`` carousel.
+
+    Returns ``False`` (and writes nothing) when the conversation isn't the user's,
+    has no messages, the last message isn't an assistant turn, or the regenerated
+    question doesn't match the last user turn — any of which means this isn't a
+    valid in-place regeneration and the caller should fall back to appending.
+    """
+    oid = _oid(conversation_id)
+    if not oid:
+        return False
+    convo = db.conversations.find_one({"_id": oid, "user_id": user_id}, {"messages": 1})
+    if not convo:
+        return False
+    messages = convo.get("messages") or []
+    if len(messages) < 2:
+        return False
+    last = messages[-1]
+    prev = messages[-2]
+    if last.get("role") != "assistant" or prev.get("role") != "user":
+        return False
+    # Guard against a stale/mismatched client: only regenerate when the question
+    # matches the turn we're replacing.
+    if (prev.get("text") or "").strip() != (question or "").strip():
+        return False
+
+    now = _now()
+    new_version = {
+        "text": answer or "",
+        "sources": sources or [],
+        "created_at": now,
+    }
+    if model_name:
+        new_version["model_name"] = model_name
+
+    # Existing versions, synthesizing one from the legacy top-level fields if the
+    # turn predates versioning.
+    existing = last.get("versions")
+    if not isinstance(existing, list) or not existing:
+        legacy = {
+            "text": last.get("text") or "",
+            "sources": last.get("sources") or [],
+            "created_at": last.get("created_at") or now,
+        }
+        if last.get("model_name"):
+            legacy["model_name"] = last["model_name"]
+        existing = [legacy]
+    versions = existing + [new_version]
+    active = len(versions) - 1
+    last_index = len(messages) - 1
+
+    update = {
+        f"messages.{last_index}.versions": versions,
+        f"messages.{last_index}.active_version": active,
+        # Mirror the now-active version onto the top-level fields.
+        f"messages.{last_index}.text": new_version["text"],
+        f"messages.{last_index}.sources": new_version["sources"],
+        "updated_at": now,
+    }
+    # Keep model_name in sync (set or clear it to match the active version).
+    if model_name:
+        update[f"messages.{last_index}.model_name"] = model_name
+    unset = {} if model_name else {f"messages.{last_index}.model_name": ""}
+
+    ops: dict = {"$set": update}
+    if unset:
+        ops["$unset"] = unset
+    result = db.conversations.update_one({"_id": oid, "user_id": user_id}, ops)
+    return result.modified_count == 1
 
 
 def rename_conversation(db: Database, conversation_id: str, user_id: str, title: str) -> dict | None:

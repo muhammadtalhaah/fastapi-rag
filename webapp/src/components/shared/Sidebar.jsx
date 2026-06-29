@@ -1,22 +1,22 @@
-import { useEffect, useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
 import {
-  Library,
+  X,
   LogIn,
+  Search,
+  Library,
+  UploadCloud,
+  PanelLeftOpen,
   MessagesSquare,
   PanelLeftClose,
-  PanelLeftOpen,
-  Search,
-  UploadCloud,
-  X,
 } from "lucide-react";
-import { ROUTES } from "@/config/routes";
-import { useAuth, useLayout, useThemeContext } from "@/context";
-import { LoginModal } from "@/components/auth";
-import SidebarRecents from "./SidebarRecents";
+import LNG from "@/language";
 import AccountMenu from "./AccountMenu";
 import SearchModal from "./SearchModal";
-import LNG from "@/language";
+import { ROUTES } from "@/config/routes";
+import { useEffect, useState } from "react";
+import SidebarRecents from "./SidebarRecents";
+import { LoginModal } from "@/components/auth";
+import { NavLink, useLocation } from "react-router-dom";
+import { useAuth, useLayout, useThemeContext } from "@/context";
 
 // Nav reads like a card-catalog index: each entry has a brass call-number, an
 // icon, and a label. Order encodes the natural workflow — ask, browse, add.
@@ -32,10 +32,11 @@ const NAV = [
 //   - mobile  (< sm_tablet): fixed off-canvas drawer, slides over a backdrop.
 //   - tablet+ (sm_tablet)  : persistent rail; collapses to an icon-only mini rail.
 const Sidebar = () => {
+  const location = useLocation();
+  const { theme, toggleTheme } = useThemeContext();
   const { user, isAuthenticated, logout } = useAuth();
   const { isMobileOpen, closeMobile, isRailCollapsed, toggleRail } = useLayout();
-  const { theme, toggleTheme } = useThemeContext();
-  const location = useLocation();
+  
   const [showLogin, setShowLogin] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
 
@@ -143,7 +144,7 @@ const Sidebar = () => {
           </button>
         </div>
 
-        <nav className=" flex flex-col gap-1 p-3 bg-red-" aria-label="Primary">
+        <nav className=" flex flex-col gap-1 p-3" aria-label="Primary">
           {navItems.map(({ to, code, label, icon: Icon, end }) => (
             <NavLink
               key={to}
@@ -219,7 +220,7 @@ const Sidebar = () => {
 
         {/* Account footer. When signed in, the theme toggle lives inside the
             account popup; guests get a standalone toggle next to Sign in. */}
-        <div className="mt-auto border-t border-rule px-4 py-4">
+        <div className={`mt-auto border-t border-rule ${isAuthenticated ? "p-0" : "p-4"}`}>
           {isAuthenticated ? (
             <AccountMenu
               user={user}
@@ -235,7 +236,7 @@ const Sidebar = () => {
               type="button"
               onClick={() => setShowLogin(true)}
               title={collapsed ? "Sign in" : undefined}
-              className={`flex w-full items-center gap-2 border border-rule px-3 py-2 text-sm text-muted transition-colors hover:border-brass hover:text-ink ${
+              className={`flex w-full items-center gap-2 border border-rule px-3 py-2 bg-ground text-sm text-muted transition-colors hover:border-brass hover:text-ink ${
                 collapsed ? "sm_tablet:justify-center sm_tablet:gap-0 sm_tablet:px-0" : ""
               }`}
             >

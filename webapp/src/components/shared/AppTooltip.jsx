@@ -1,12 +1,12 @@
 import { Tooltip } from "antd";
-import React from "react";
 
 const AppTooltip = ({
   ref,
   title,
   arrow,
   children,
-  popupVisible,
+  open,
+  onOpenChange,
   placement = "bottom",
 }) => {
   return (
@@ -17,7 +17,8 @@ const AppTooltip = ({
       title={title}
       destroyOnHidden
       placement={placement}
-      popupVisible={popupVisible}
+      open={open}
+      onOpenChange={onOpenChange}
     >
       {children}
     </Tooltip>

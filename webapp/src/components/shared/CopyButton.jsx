@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 import AppTooltip from "./AppTooltip";
@@ -17,13 +18,23 @@ const CopyButton = ({
 }) => {
   const { copied, copy } = useCopyToClipboard();
 
+  // Track genuine hover/focus so the tooltip is fully controlled. Without this,
+  // antd keeps its own open-state: after a click flips the title to "" (hiding
+  // the tooltip) and `copied` later resets, antd re-shows the tooltip from
+  // stale hover state even though the pointer has left the button.
+  const [hovered, setHovered] = useState(false);
+
   const handleClick = () => {
     const text = typeof getText === "function" ? getText() : getText;
     copy(text);
   };
 
   return (
-    <AppTooltip title={copied ? "" : LNG.eng.copyResponse}>
+    <AppTooltip
+      title={LNG.eng.copyResponse}
+      open={hovered && !copied}
+      onOpenChange={setHovered}
+    >
       <button
         type="button"
         onClick={handleClick}

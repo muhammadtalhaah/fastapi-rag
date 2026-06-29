@@ -84,18 +84,48 @@ export function useChat({
     return onSocketState(setSocketState);
   }, []);
 
-  const send = useCallback(async (question) => {
+  // Send a question. Normally (regenerateId omitted) this appends a new user
+  // turn plus a pending assistant turn. When `regenerateId` is the id of an
+  // existing assistant message, NO new turns are added: the answer streams into
+  // that same message as a fresh *version*, and the in-place turn becomes the
+  // active one in its < n/m > carousel. The backend is told `regenerate: true`
+  // so it replaces the last assistant turn in durable history instead of
+  // appending a duplicate exchange.
+  const send = useCallback(async (question, { regenerateId = null } = {}) => {
     const trimmed = question.trim();
     if (!trimmed || isAsking || socketState !== "OPEN") return;
 
-    const userMessage = { id: makeId(), role: "user", text: trimmed };
-    const pendingId = makeId();
+    const isRegenerate = Boolean(regenerateId);
+    const pendingId = isRegenerate ? regenerateId : makeId();
 
-    setMessages((prev) => [
-      ...prev,
-      userMessage,
-      { id: pendingId, role: "assistant", status: "pending", text: "", sources: [], activity: null, modelName: null },
-    ]);
+    if (isRegenerate) {
+      // Reset the targeted message to a pending state for the new version while
+      // keeping its existing versions; a fresh version is committed on done.
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === pendingId
+            ? { ...m, status: "pending", text: "", sources: [], activity: null, modelName: null }
+            : m,
+        ),
+      );
+    } else {
+      const userMessage = { id: makeId(), role: "user", text: trimmed };
+      setMessages((prev) => [
+        ...prev,
+        userMessage,
+        {
+          id: pendingId,
+          role: "assistant",
+          status: "pending",
+          text: "",
+          sources: [],
+          activity: null,
+          modelName: null,
+          versions: [],
+          activeVersion: 0,
+        },
+      ]);
+    }
     setIsAsking(true);
 
     const patch = (fields) =>
@@ -103,7 +133,7 @@ export function useChat({
         prev.map((m) => (m.id === pendingId ? { ...m, ...fields } : m))
       );
 
-    await askStream(trimmed, DEFAULT_TOP_K, sessionIdRef.current, conversationIdRef.current, webSearchRef.current, {
+    await askStream(trimmed, DEFAULT_TOP_K, sessionIdRef.current, conversationIdRef.current, webSearchRef.current, isRegenerate, {
       onSession: (sessionId) => {
         sessionIdRef.current = sessionId;
       },
@@ -144,12 +174,52 @@ export function useChat({
         );
       },
       onDone: () => {
-        patch({ status: "done", activity: null });
+        // Commit the streamed answer as a new version of this turn and make it
+        // the active one. The top-level text/sources/modelName already hold the
+        // freshly streamed content, so the new version snapshots them; the
+        // < n/m > carousel reads from `versions`/`activeVersion`.
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m.id !== pendingId) return m;
+            const versions = [
+              ...(m.versions || []),
+              { text: m.text, sources: m.sources, modelName: m.modelName },
+            ];
+            return {
+              ...m,
+              status: "done",
+              activity: null,
+              versions,
+              activeVersion: versions.length - 1,
+            };
+          }),
+        );
         setIsAsking(false);
         onTurnComplete?.();
       },
       onError: (message) => {
-        patch({ status: "error", error: message, activity: null });
+        // A failed regenerate must not destroy the prior answer: fall back to
+        // the latest existing version (if any) and clear the error.
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m.id !== pendingId) return m;
+            if (isRegenerate && m.versions?.length) {
+              const last = m.versions.length - 1;
+              const v = m.versions[last];
+              return {
+                ...m,
+                status: "done",
+                error: null,
+                activity: null,
+                text: v.text,
+                sources: v.sources,
+                modelName: v.modelName,
+                activeVersion: last,
+              };
+            }
+            return { ...m, status: "error", error: message, activity: null };
+          }),
+        );
         setIsAsking(false);
       },
     });
@@ -168,6 +238,60 @@ export function useChat({
     },
     [messages, send],
   );
+
+  // Edit a previously-sent user message and re-ask. Mirrors `retry`'s truncate-
+  // and-resend: everything from the edited turn onward is dropped, then `send`
+  // appends the revised question plus a fresh assistant turn. A no-op edit (same
+  // text after trimming) is ignored so an accidental save doesn't re-run a turn.
+  const editMessage = useCallback(
+    (userId, newText) => {
+      const trimmed = newText.trim();
+      if (!trimmed || isAsking) return;
+      const index = messages.findIndex((m) => m.id === userId);
+      if (index < 0 || messages[index].role !== "user") return;
+      if (trimmed === messages[index].text.trim()) return;
+      const removeIds = new Set(messages.slice(index).map((m) => m.id));
+      setMessages((prev) => prev.filter((m) => !removeIds.has(m.id)));
+      send(trimmed);
+    },
+    [messages, isAsking, send],
+  );
+
+  // Regenerate a completed answer in place: re-ask its question and stream a new
+  // *version* into the same turn (no new user/assistant pair). The new version
+  // is appended to the turn's < n/m > carousel and made active. Persists by
+  // telling the backend to replace the last assistant turn (`regenerate: true`).
+  const regenerate = useCallback(
+    (assistantId) => {
+      const index = messages.findIndex((m) => m.id === assistantId);
+      if (index < 1) return;
+      const userTurn = messages[index - 1];
+      const question = userTurn?.role === "user" ? userTurn.text : null;
+      if (!question) return;
+      send(question, { regenerateId: assistantId });
+    },
+    [messages, send],
+  );
+
+  // Flip the < n/m > carousel to a specific stored version, mirroring its
+  // text/sources/modelName up to the rendered top-level fields. Local-only:
+  // reopening a conversation defaults to the latest version (see toMessage).
+  const setActiveVersion = useCallback((assistantId, versionIndex) => {
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m.id !== assistantId || !m.versions?.length) return m;
+        const clamped = Math.max(0, Math.min(versionIndex, m.versions.length - 1));
+        const v = m.versions[clamped];
+        return {
+          ...m,
+          activeVersion: clamped,
+          text: v.text,
+          sources: v.sources,
+          modelName: v.modelName,
+        };
+      }),
+    );
+  }, []);
 
   const newChat = useCallback(() => {
     loadAbortRef.current?.abort();
@@ -229,6 +353,9 @@ export function useChat({
     setWebSearch,
     send,
     retry,
+    editMessage,
+    regenerate,
+    setActiveVersion,
     newChat,
     loadConversation,
   };

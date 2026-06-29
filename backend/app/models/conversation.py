@@ -19,6 +19,19 @@ class ConversationSummary(BaseModel):
     updated_at: datetime | None = None
 
 
+class ConversationMessageVersion(BaseModel):
+    """One regenerated answer for an assistant turn.
+
+    A turn that has never been regenerated has a single version whose content
+    mirrors the turn's top-level ``text``/``sources``/``model_name`` fields (kept
+    in sync for backward compatibility with clients/search that read those).
+    """
+    text: str = ""
+    sources: list[AnySource] = []
+    model_name: str | None = None
+    created_at: datetime | None = None
+
+
 class ConversationMessage(BaseModel):
     role: str  # "user" | "assistant"
     text: str
@@ -29,6 +42,12 @@ class ConversationMessage(BaseModel):
     # conversations stay valid; the client falls back gracefully).
     model_name: str | None = None
     created_at: datetime | None = None
+    # Regenerated answer versions for an assistant turn (newest last). Absent on
+    # user turns and on assistant turns saved before regeneration existed; the
+    # client synthesizes a single version from the top-level fields in that case.
+    # ``active_version`` indexes the currently-active answer (mirrored above).
+    versions: list[ConversationMessageVersion] | None = None
+    active_version: int | None = None
 
 
 class ConversationDetail(BaseModel):

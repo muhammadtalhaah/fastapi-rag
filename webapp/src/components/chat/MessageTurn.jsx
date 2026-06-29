@@ -1,11 +1,16 @@
-import {
-  Spinner,
-  AppButton,
-  CopyButton,
-  AppTooltip,
-} from "@/components/shared";
+import { Spinner, AppButton, CopyButton, AppTooltip } from "@/components/shared";
 import MarkdownRenderer from "./MarkdownRenderer";
-import { AlertTriangle, BookOpen, Brain, Globe } from "lucide-react";
+import UserMessage from "./UserMessage";
+import LNG from "@/language";
+import {
+  AlertTriangle,
+  BookOpen,
+  Brain,
+  ChevronLeft,
+  ChevronRight,
+  Globe,
+  RefreshCw,
+} from "lucide-react";
 import { forwardRef, memo, useCallback, useRef, useState } from "react";
 
 const MAX_FAVICONS = 3;
@@ -20,8 +25,7 @@ const FaviconImg = memo(({ url }) => {
   } catch {
     /* keep raw url */
   }
-  if (failed)
-    return <Globe size={12} aria-hidden="true" className="text-muted" />;
+  if (failed) return <Globe size={12} aria-hidden="true" className="text-muted" />;
   return (
     <img
       src={`https://www.google.com/s2/favicons?domain=${origin}`}
@@ -56,6 +60,45 @@ const FaviconStack = memo(({ sources }) => {
 });
 FaviconStack.displayName = "FaviconStack";
 
+// ─── Version pager ─────────────────────────────────────────────────────────────
+
+// A compact "< n/m >" control for flipping between regenerated answer versions
+// of a single turn. Only rendered when a turn has more than one version. The
+// arrows are disabled at the ends and while a response is streaming (canPage).
+const VersionPager = memo(({ activeVersion, versionCount, onSelectVersion, canPage }) => {
+  if (versionCount <= 1) return null;
+  const atFirst = activeVersion <= 0;
+  const atLast = activeVersion >= versionCount - 1;
+  const arrowClass =
+    "inline-flex items-center rounded-md p-1 text-muted transition-colors hover:bg-surface hover:text-ink disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted";
+  return (
+    <span className="flex items-center gap-0.5 font-mono text-xs text-muted">
+      <button
+        type="button"
+        onClick={() => onSelectVersion(activeVersion - 1)}
+        disabled={!canPage || atFirst}
+        aria-label="Previous version"
+        className={arrowClass}
+      >
+        <ChevronLeft size={14} aria-hidden="true" />
+      </button>
+      <span className="tabular-nums">
+        {activeVersion + 1}/{versionCount}
+      </span>
+      <button
+        type="button"
+        onClick={() => onSelectVersion(activeVersion + 1)}
+        disabled={!canPage || atLast}
+        aria-label="Next version"
+        className={arrowClass}
+      >
+        <ChevronRight size={14} aria-hidden="true" />
+      </button>
+    </span>
+  );
+});
+VersionPager.displayName = "VersionPager";
+
 // ─── Markdown body ─────────────────────────────────────────────────────────────
 
 // Resting gap below the last (completed) message so it isn't flush with the
@@ -64,11 +107,24 @@ FaviconStack.displayName = "FaviconStack";
 // hugging the bottom edge; it collapses back the moment the turn completes.
 // `transition-[margin]` keeps that collapse smooth rather than a hard jump.
 const BOTTOM_MARGIN = "mb-40";
-const STREAMING_BOTTOM_MARGIN = "mb-[50vh]";
-const BOTTOM_MARGIN_TRANSITION = "transition-[margin] duration-300 ease-out motion-reduce:transition-none";
+const STREAMING_BOTTOM_MARGIN = "mb-32";
+const BOTTOM_MARGIN_TRANSITION =
+  "transition-[margin] duration-300 ease-out motion-reduce:transition-none";
 
 const MarkdownBody = memo(
-  ({ text, sources, isLast, status, modelName, onOpenSources }) => {
+  ({
+    text,
+    sources,
+    isLast,
+    status,
+    modelName,
+    onOpenSources,
+    onRegenerate,
+    canRegenerate,
+    activeVersion,
+    versionCount,
+    onSelectVersion,
+  }) => {
     // Keep onOpenSources in a ref so MarkdownRenderer's internal components map
     // never needs to change identity during streaming.
     const onCiteRef = useRef(null);
@@ -91,11 +147,32 @@ const MarkdownBody = memo(
         ) : null}
         {status === "done" ? (
           <div className="mt-3 flex items-center gap-1">
+            <VersionPager
+              activeVersion={activeVersion}
+              versionCount={versionCount}
+              onSelectVersion={onSelectVersion}
+              canPage={canRegenerate}
+            />
             <CopyButton
               getText={() => text}
               className="rounded-md p-1.5 hover:bg-surface"
             />
-            <AppTooltip title={modelName || "Unknown model"}>
+            {onRegenerate ? (
+              <AppTooltip title={LNG.eng.regenerate}>
+                <button
+                  type="button"
+                  onClick={onRegenerate}
+                  disabled={!canRegenerate}
+                  aria-label={LNG.eng.regenerate}
+                  className="inline-flex items-center rounded-md p-1.5 text-muted transition-colors hover:bg-surface hover:text-ink disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-muted"
+                >
+                  <RefreshCw size={16} aria-hidden="true" />
+                </button>
+              </AppTooltip>
+            ) : null}
+            <AppTooltip
+              title={modelName ? LNG.eng.used + " " + modelName : LNG.eng.unknownModel}
+            >
               <div className="inline-flex cursor-default items-center rounded-md p-1.5 text-muted transition-colors hover:bg-sidebar hover:text-ink">
                 <Brain size={16} aria-hidden="true" />
               </div>
@@ -132,21 +209,37 @@ const HIGHLIGHT_RING =
 
 const MessageTurn = memo(
   forwardRef(
-    ({ message, onRetry, isLast, isHighlighted, onOpenSources }, ref) => {
+    (
+      {
+        message,
+        onRetry,
+        onRegenerate,
+        onSelectVersion,
+        onEditMessage,
+        isAuthenticated,
+        canRegenerate,
+        isLast,
+        isHighlighted,
+        onOpenSources,
+      },
+      ref,
+    ) => {
       const highlightClass = isHighlighted ? HIGHLIGHT_RING : "";
 
       if (message.role === "user") {
         return (
-          <div ref={ref} className={`flex justify-end ${highlightClass}`}>
-            <p className="max-w-[85%] border border-rule bg-surface px-4 py-2.5 text-sm leading-relaxed text-ink">
-              {message.text}
-            </p>
+          <div ref={ref} className={highlightClass}>
+            <UserMessage
+              message={message}
+              isAuthenticated={isAuthenticated}
+              canEdit={canRegenerate}
+              onEdit={onEditMessage}
+            />
           </div>
         );
       }
 
-      const isLive =
-        message.status === "pending" || message.status === "streaming";
+      const isLive = message.status === "pending" || message.status === "streaming";
       const activityLabel = message.activity || null;
       const hasText = Boolean(message.text);
 
@@ -174,6 +267,15 @@ const MessageTurn = memo(
               status={message.status}
               modelName={message.modelName}
               onOpenSources={onOpenSources}
+              onRegenerate={
+                isAuthenticated && onRegenerate
+                  ? () => onRegenerate(message.id)
+                  : null
+              }
+              canRegenerate={canRegenerate}
+              activeVersion={message.activeVersion ?? 0}
+              versionCount={message.versions?.length ?? 0}
+              onSelectVersion={(index) => onSelectVersion?.(message.id, index)}
             />
           ) : null}
 
@@ -195,7 +297,11 @@ const MessageTurn = memo(
   (prev, next) =>
     prev.message === next.message &&
     prev.isLast === next.isLast &&
-    prev.isHighlighted === next.isHighlighted,
+    prev.isHighlighted === next.isHighlighted &&
+    prev.canRegenerate === next.canRegenerate &&
+    prev.onRegenerate === next.onRegenerate &&
+    prev.isAuthenticated === next.isAuthenticated &&
+    prev.onEditMessage === next.onEditMessage,
 );
 
 MessageTurn.displayName = "MessageTurn";

@@ -114,3 +114,82 @@ def test_search_pagination(db):
     assert len(page2["results"]) == 2
     # No overlap between pages.
     assert not ({r["id"] for r in page1["results"]} & {r["id"] for r in page2["results"]})
+
+
+# --- regeneration / answer versions -----------------------------------------
+
+
+def test_append_turn_stores_a_single_initial_version(db):
+    convo_id = _seed(db, "user-1", "Versions")
+    conversation_service.append_turn(
+        db, convo_id, "user-1",
+        question="What is PTO?", answer="Paid time off.", sources=[], model_name="gpt-5.4",
+    )
+    convo = conversation_service.get_conversation(db, convo_id, "user-1")
+    assistant = convo["messages"][1]
+    assert assistant["versions"] == [
+        {"text": "Paid time off.", "sources": [], "created_at": assistant["versions"][0]["created_at"], "model_name": "gpt-5.4"}
+    ]
+    assert assistant["active_version"] == 0
+    # Top-level fields mirror the active version.
+    assert assistant["text"] == "Paid time off."
+
+
+def test_regenerate_last_turn_appends_version_and_activates_it(db):
+    convo_id = _seed(db, "user-1", "Versions")
+    conversation_service.append_turn(
+        db, convo_id, "user-1",
+        question="What is PTO?", answer="First answer.", sources=[], model_name="gpt-5.4",
+    )
+
+    ok = conversation_service.regenerate_last_turn(
+        db, convo_id, "user-1",
+        question="What is PTO?", answer="Second answer.", sources=[], model_name="gpt-5.4",
+    )
+
+    assert ok is True
+    convo = conversation_service.get_conversation(db, convo_id, "user-1")
+    # No new user/assistant pair — still one exchange.
+    assert [m["role"] for m in convo["messages"]] == ["user", "assistant"]
+    assistant = convo["messages"][1]
+    assert [v["text"] for v in assistant["versions"]] == ["First answer.", "Second answer."]
+    assert assistant["active_version"] == 1
+    # Active version mirrored to top-level (what search / older clients read).
+    assert assistant["text"] == "Second answer."
+
+
+def test_regenerate_rejects_mismatched_question(db):
+    convo_id = _seed(db, "user-1", "Versions")
+    conversation_service.append_turn(
+        db, convo_id, "user-1",
+        question="What is PTO?", answer="First answer.", sources=[],
+    )
+
+    ok = conversation_service.regenerate_last_turn(
+        db, convo_id, "user-1",
+        question="A different question", answer="Should not be stored.", sources=[],
+    )
+
+    assert ok is False
+    convo = conversation_service.get_conversation(db, convo_id, "user-1")
+    assert convo["messages"][1]["text"] == "First answer."
+    assert len(convo["messages"][1]["versions"]) == 1
+
+
+def test_regenerate_on_empty_conversation_is_noop(db):
+    convo_id = _seed(db, "user-1", "Empty")
+    ok = conversation_service.regenerate_last_turn(
+        db, convo_id, "user-1", question="hi", answer="hello", sources=[],
+    )
+    assert ok is False
+
+
+def test_regenerate_is_scoped_to_owner(db):
+    convo_id = _seed(db, "user-1", "Versions")
+    conversation_service.append_turn(
+        db, convo_id, "user-1", question="What is PTO?", answer="First.", sources=[],
+    )
+    ok = conversation_service.regenerate_last_turn(
+        db, convo_id, "user-2", question="What is PTO?", answer="Hijack.", sources=[],
+    )
+    assert ok is False

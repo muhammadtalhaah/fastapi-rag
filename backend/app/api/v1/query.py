@@ -168,8 +168,25 @@ async def query_websocket(websocket: WebSocket):
             await websocket.send_text(json.dumps({"event": "session", "data": {"session_id": session_id}}))
 
             user = _resolve_ws_user(websocket, db)
+
+            # Regeneration is a logged-in-only action: it rewrites a stored answer
+            # in an owned conversation, which guests don't have. Reject an
+            # unauthenticated regenerate explicitly rather than silently treating
+            # it as a fresh question, so the client's gating can't be bypassed.
+            if body.regenerate and not user:
+                await websocket.send_text(
+                    json.dumps({
+                        "event": "error",
+                        "data": {"message": "Sign in to regenerate a response."},
+                    })
+                )
+                continue
+
             requested_conversation_id = (payload.get("conversation_id") or "").strip() or None
             conversation_id = None
+            # A regeneration only applies to an existing, owned conversation; for a
+            # guest or a brand-new chat it degrades to a normal turn.
+            is_regenerate = bool(body.regenerate and requested_conversation_id)
             if user:
                 if requested_conversation_id and conversation_service.owns_conversation(
                     db, requested_conversation_id, user["id"]
@@ -182,6 +199,11 @@ async def query_websocket(websocket: WebSocket):
                     convo = conversation_service.get_conversation(db, conversation_id, user["id"])
                     if convo:
                         session_service.hydrate_from_transcript(session, convo.get("messages", []))
+                    # Regenerating the last answer: drop that exchange from the
+                    # context window so the model doesn't see (and echo) its own
+                    # prior answer to the same question.
+                    if is_regenerate:
+                        session_service.pop_last_exchange(session)
                 else:
                     conversation_id = conversation_service.create_conversation(db, user["id"], body.question)
                 await websocket.send_text(
@@ -228,15 +250,30 @@ async def query_websocket(websocket: WebSocket):
                             user["id"],
                             conversation_service.generate_title(body.question, "".join(answer_parts)),
                         )
-                    conversation_service.append_turn(
-                        db,
-                        conversation_id,
-                        user["id"],
-                        body.question,
-                        "".join(answer_parts),
-                        captured_sources,
-                        captured_model,
-                    )
+                    # A regeneration replaces the last answer in place (a new
+                    # version in its carousel); fall back to appending if the
+                    # last turn no longer matches (e.g. a stale client).
+                    regenerated = False
+                    if is_regenerate:
+                        regenerated = conversation_service.regenerate_last_turn(
+                            db,
+                            conversation_id,
+                            user["id"],
+                            body.question,
+                            "".join(answer_parts),
+                            captured_sources,
+                            captured_model,
+                        )
+                    if not regenerated:
+                        conversation_service.append_turn(
+                            db,
+                            conversation_id,
+                            user["id"],
+                            body.question,
+                            "".join(answer_parts),
+                            captured_sources,
+                            captured_model,
+                        )
             except ValueError as e:
                 logger.info("[ws-endpoint] User-facing error: %s", e)
                 await websocket.send_text(json.dumps({"event": "error", "data": {"message": str(e)}}))

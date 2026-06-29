@@ -21,15 +21,32 @@ function toMessage(raw) {
   if (raw.role === "user") {
     return { id: makeId(), role: "user", text: raw.text || "" };
   }
+  // An assistant turn may carry multiple answer versions (from regeneration).
+  // Stored versions take precedence; legacy turns without `versions` synthesize
+  // a single version from the top-level text/sources/model_name. On reload we
+  // always default to the latest version (see the goal decision).
+  const rawVersions =
+    Array.isArray(raw.versions) && raw.versions.length
+      ? raw.versions
+      : [{ text: raw.text, sources: raw.sources, model_name: raw.model_name }];
+  const versions = rawVersions.map((v) => ({
+    text: v.text || "",
+    sources: (v.sources || []).map(toSource),
+    modelName: v.model_name || null,
+  }));
+  const activeVersion = versions.length - 1;
+  const active = versions[activeVersion];
   return {
     id: makeId(),
     role: "assistant",
     status: "done",
-    text: raw.text || "",
-    sources: (raw.sources || []).map(toSource),
+    text: active.text,
+    sources: active.sources,
     // Older messages predate model tracking; null hides the label gracefully.
-    modelName: raw.model_name || null,
+    modelName: active.modelName,
     activity: null,
+    versions,
+    activeVersion,
   };
 }
 

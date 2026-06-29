@@ -23,9 +23,10 @@ def _collect(agen):
     return asyncio.run(_run())
 
 
-def _parse(frame):
+def _parse(frame: str) -> tuple[str, dict[str, object]]:
     """Parse one SSE frame string into (event, data_dict)."""
-    event = data = None
+    event: str = ""
+    data: dict[str, object] = {}
     for line in frame.splitlines():
         if line.startswith("event:"):
             event = line[len("event:"):].strip()

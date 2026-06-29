@@ -4,28 +4,61 @@ import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import { CopyButton } from "@/components/shared";
 
+// ─── Raw <br> handling ──────────────────────────────────────────────────────
+//
+// Models often emit literal <br> tags to break lines inside markdown table
+// cells (which can't hold real newlines). react-markdown escapes raw HTML by
+// default — and we deliberately keep it that way (no rehype-raw) to avoid an
+// XSS surface — so those tags would otherwise show up as visible "<br>" text.
+//
+// We pre-replace every <br> variant with a private-use sentinel character
+// BEFORE markdown parsing, then split text nodes on that sentinel at render
+// time and inject real <br/> elements. This converts the breaks safely without
+// enabling arbitrary HTML, and works everywhere a text node can appear
+// (paragraphs, list items, table cells).
+const BR_SENTINEL = "";
+const BR_TAG_RE = /<br\s*\/?>/gi;
+
+const replaceBrTags = (text) =>
+  typeof text === "string" ? text.replace(BR_TAG_RE, BR_SENTINEL) : text;
+
 // ─── Citation helpers ─────────────────────────────────────────────────────────
 
 const CITE_RE = /(\[\d+\])/g;
 
-const parseCitations = (text, onCiteRef) =>
-  text.split(CITE_RE).map((part, i) => {
-    const match = part.match(/^\[(\d+)\]$/);
-    if (!match) return part;
-    const n = parseInt(match[1], 10);
-    return (
-      <sup key={i}>
-        <button
-          type="button"
-          onClick={() => onCiteRef.current(n)}
-          className="ml-0.5 cursor-pointer rounded px-0.5 font-mono text-[0.65em] text-brass underline underline-offset-2 transition-colors hover:text-brass/70"
-          aria-label={`Source ${n}`}
-        >
-          {n}
-        </button>
-      </sup>
-    );
+const renderCitePart = (part, key, onCiteRef) => {
+  const match = part.match(/^\[(\d+)\]$/);
+  if (!match) return part;
+  const n = parseInt(match[1], 10);
+  return (
+    <sup key={key}>
+      <button
+        type="button"
+        onClick={() => onCiteRef.current(n)}
+        className="ml-0.5 cursor-pointer rounded px-0.5 font-mono text-[0.65em] text-brass underline underline-offset-2 transition-colors hover:text-brass/70"
+        aria-label={`Source ${n}`}
+      >
+        {n}
+      </button>
+    </sup>
+  );
+};
+
+// Split a text node first on the <br> sentinel, then parse citations within
+// each segment, interleaving real <br/> elements between segments.
+const parseCitations = (text, onCiteRef) => {
+  const segments = text.split(BR_SENTINEL);
+  return segments.flatMap((segment, segIdx) => {
+    const parts = segment
+      .split(CITE_RE)
+      .map((part, i) =>
+        renderCitePart(part, `${segIdx}-${i}`, onCiteRef),
+      );
+    return segIdx < segments.length - 1
+      ? [...parts, <br key={`br-${segIdx}`} />]
+      : parts;
   });
+};
 
 const injectCitations = (children, onCiteRef) => {
   if (Array.isArray(children))
@@ -140,11 +173,13 @@ const makeMdComponents = (onCiteRef) => ({
   ),
   th: ({ children }) => (
     <th className="border border-rule bg-surface px-3 py-1.5 text-left font-semibold text-ink">
-      {children}
+      {injectCitations(children, onCiteRef)}
     </th>
   ),
   td: ({ children }) => (
-    <td className="border border-rule px-3 py-1.5 text-ink">{children}</td>
+    <td className="border border-rule px-3 py-1.5 align-top text-ink">
+      {injectCitations(children, onCiteRef)}
+    </td>
   ),
 });
 
@@ -168,13 +203,17 @@ const MarkdownRenderer = memo(({ text, onCite }) => {
 
   const components = useMemo(() => makeMdComponents(onCiteRef), []);
 
+  // Swap literal <br> tags for a sentinel before parsing; the components map
+  // turns the sentinel into real <br/> elements (see replaceBrTags above).
+  const source = useMemo(() => replaceBrTags(text), [text]);
+
   return (
     <ReactMarkdown
       remarkPlugins={REMARK_PLUGINS}
       rehypePlugins={REHYPE_PLUGINS}
       components={components}
     >
-      {text}
+      {source}
     </ReactMarkdown>
   );
 });

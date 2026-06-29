@@ -87,6 +87,22 @@ def hydrate_from_transcript(session: dict, messages: list[dict], recent_turns: i
     )
 
 
+def pop_last_exchange(session: dict) -> None:
+    """Drop the most recent user+assistant pair from the verbatim window.
+
+    Used before a *regeneration*: the question is about to be re-asked, so we
+    remove its prior turn from context to avoid feeding the model its own
+    previous answer (and to avoid the same question appearing twice). Best-effort
+    — only trims the in-memory recent window; the rolling summary is left as-is.
+    """
+    recent: list[dict] = session.get("recent") or []
+    if recent and recent[-1].get("role") == "assistant":
+        recent.pop()
+    if recent and recent[-1].get("role") == "user":
+        recent.pop()
+    session["recent"] = recent
+
+
 def build_history(session: dict) -> list[dict]:
     """Compose the compact history sent to the LLM: summary (as a system note)
     followed by the verbatim recent window."""

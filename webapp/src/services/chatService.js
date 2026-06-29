@@ -1,4 +1,5 @@
 import { ENDPOINTS } from "@/api/endpoints";
+import { cleanSnippet } from "@/utils/format";
 
 // ---------------------------------------------------------------------------
 // Persistent WebSocket — opened once on app start, kept alive forever.
@@ -149,7 +150,7 @@ export function toSource(raw, index) {
       type: "web",
       title: raw.title,
       url: raw.url,
-      snippet: raw.snippet,
+      snippet: cleanSnippet(raw.snippet),
     };
   }
   return {
@@ -178,12 +179,14 @@ export function askStream(
   sessionId,
   conversationId,
   webSearch,
+  regenerate,
   {
     onSession,
     onConversation,
     onConversationTitle,
     onStatus,
     onSources,
+    onModel,
     onToken,
     onDone,
     onError,
@@ -210,6 +213,7 @@ export function askStream(
       onConversationTitle,
       onStatus,
       onSources,
+      onModel,
       onToken,
       onDone,
       onError,
@@ -225,6 +229,9 @@ export function askStream(
         // Defaults to true on the backend if omitted; sent explicitly so the
         // user's per-conversation toggle is honored.
         web_search: webSearch !== false,
+        // When true, the backend replaces the last assistant turn in durable
+        // history (a regeneration) instead of appending a new exchange.
+        regenerate: regenerate === true,
       }),
     );
   });
