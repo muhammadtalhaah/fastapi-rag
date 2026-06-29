@@ -73,10 +73,17 @@ def update_conversation(
     body: ConversationUpdate,
     user: dict = Depends(get_current_user),
 ):
-    """Rename one of the user's conversations."""
+    """Manage one of the user's conversations — rename and/or pin/unpin.
+
+    Each provided field is applied; the last write wins as the returned row.
+    """
     db = get_db()
-    convo = conversation_service.rename_conversation(db, conversation_id, user["id"], body.title)
-    if not convo:
+    convo = None
+    if body.pinned is not None:
+        convo = conversation_service.set_pinned(db, conversation_id, user["id"], body.pinned)
+    if body.title is not None:
+        convo = conversation_service.rename_conversation(db, conversation_id, user["id"], body.title)
+    if convo is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
     return convo
 

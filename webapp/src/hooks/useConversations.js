@@ -7,9 +7,17 @@ export const CONVERSATIONS_KEY = ["conversations"];
 const toSummary = (raw) => ({
   id: raw.id,
   title: raw.title || "Untitled",
+  pinned: Boolean(raw.pinned),
   updatedAt: raw.updated_at || raw.created_at || null,
   isGeneratingTitle: false,
 });
+
+// Pinned conversations sort above unpinned ones. Stable: within each group the
+// existing relative order is preserved (the server already returns each group
+// recency-ordered), so this can be re-applied after an optimistic patch without
+// disturbing recency.
+const sortConversations = (list) =>
+  [...list].sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)));
 
 // Durable chat history for the logged-in user. The list is server state in the
 // query cache; it's only fetched when authenticated (guests have no history).
@@ -36,7 +44,9 @@ export function useConversations() {
   const setConversations = (updater) => {
     queryClient.setQueryData(CONVERSATIONS_KEY, (current) => {
       const list = Array.isArray(current) ? current : [];
-      return updater(list);
+      // Re-sort after every cache mutation so pinned items always float to the
+      // top in real time — both on optimistic patches and server confirmations.
+      return sortConversations(updater(list));
     });
   };
 
@@ -85,6 +95,23 @@ export function useConversations() {
     },
   });
 
+  const setPinned = useMutation({
+    mutationFn: ({ id, pinned }) => conversationService.updateConversation(id, { pinned }),
+    onMutate: async ({ id, pinned }) => {
+      const previous = queryClient.getQueryData(CONVERSATIONS_KEY);
+      // Optimistic: flip the flag and let setConversations re-sort so the row
+      // moves to/from the top immediately, no refetch needed.
+      patchConversation(id, { pinned });
+      return { previous };
+    },
+    onSuccess: (updated) => patchConversation(updated.id, { pinned: updated.pinned }),
+    onError: (_error, _variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(CONVERSATIONS_KEY, context.previous);
+      }
+    },
+  });
+
   const refresh = () => queryClient.invalidateQueries({ queryKey: CONVERSATIONS_KEY });
 
   return {
@@ -95,6 +122,8 @@ export function useConversations() {
     upsertConversation,
     renameConversation: rename.mutate,
     renamingId: rename.isPending ? rename.variables?.id : null,
+    pinConversation: setPinned.mutate,
+    pinningId: setPinned.isPending ? setPinned.variables?.id : null,
     deleteConversation: deletion.mutate,
     deletingId: deletion.isPending ? deletion.variables : null,
   };

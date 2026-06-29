@@ -9,6 +9,7 @@ function toSummary(raw) {
   return {
     id: raw.id,
     title: raw.title || "Untitled",
+    pinned: Boolean(raw.pinned),
     updatedAt: raw.updated_at || raw.created_at || null,
   };
 }

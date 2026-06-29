@@ -52,6 +52,13 @@ def ensure_indexes(db: Database) -> None:
         [("user_id", ASCENDING), ("updated_at", DESCENDING)],
         name="conversation_user_recent",
     )
+    # Pinning sorts pinned conversations above unpinned ones, then by recency
+    # within each group. This compound index backs that "by user, pinned-first,
+    # then newest-first" sidebar query.
+    db.conversations.create_index(
+        [("user_id", ASCENDING), ("pinned", DESCENDING), ("updated_at", DESCENDING)],
+        name="conversation_user_pinned_recent",
+    )
     # Full-text search over the sidebar "search history" feature: a single text
     # index spanning the title and every message body. Weighting the title higher
     # than message text makes a title hit rank above an incidental body mention,

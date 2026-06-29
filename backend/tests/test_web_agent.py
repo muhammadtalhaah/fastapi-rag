@@ -115,6 +115,9 @@ def test_happy_path_streams_citations_and_synthesized_answer(db, monkeypatch):
         "title": "Latest News",
         "url": "https://news.com/a",
         "snippet": "Something happened today.",
+        # Publisher name derived from the host; date empty when none supplied.
+        "source_name": "News",
+        "published_date": "",
     }
 
     # Synthesized answer streamed token-by-token.

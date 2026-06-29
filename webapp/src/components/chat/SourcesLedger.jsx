@@ -1,6 +1,7 @@
 import {
   memo,
   useCallback,
+  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -117,6 +118,11 @@ ScoreBar.displayName = "ScoreBar";
 // whether it holds 10 sources or several hundred.
 const ROW_CV = { contentVisibility: "auto", containIntrinsicSize: "auto 52px" };
 
+// Brief highlight applied to the row a citation click targeted. `scroll-mt`
+// keeps it clear of the sticky summary bar when scrolled into view.
+const FOCUS_RING =
+  "scroll-mt-4 bg-brass/5 ring-1 ring-inset ring-brass/40 transition-colors";
+
 // Hoisted so the chunk-list ledger line doesn't allocate a fresh style object
 // on every DocRow render.
 const CHUNK_LIST_STYLE = {
@@ -129,10 +135,14 @@ const CHUNK_LIST_STYLE = {
 // Each row is memoized and takes a boolean `open` + a stable `onToggle`. When a
 // single row toggles, only the open-flag of THAT row changes, so memo skips
 // re-rendering every other row — expand/collapse touches one item, not the list.
-const WebSourceRow = memo(({ source, open, last, onToggle }) => {
+const WebSourceRow = memo(({ source, open, last, focused, rowRef, onToggle }) => {
   const toggle = useCallback(() => onToggle(source.id), [onToggle, source.id]);
   return (
-    <li className={last ? "" : "border-b border-rule"} style={ROW_CV}>
+    <li
+      ref={focused ? rowRef : undefined}
+      className={`${last ? "" : "border-b border-rule"} ${focused ? FOCUS_RING : ""}`}
+      style={ROW_CV}
+    >
       <button
         type="button"
         onClick={toggle}
@@ -175,7 +185,7 @@ WebSourceRow.displayName = "WebSourceRow";
 
 // ─── Document row ─────────────────────────────────────────────────────────────
 
-const DocRow = memo(({ doc, open, last, onToggle }) => {
+const DocRow = memo(({ doc, open, last, focused, rowRef, onToggle }) => {
   const toggle = useCallback(() => onToggle(doc.id), [onToggle, doc.id]);
 
   // Chunk-open state is LOCAL to each DocRow. This keeps a chunk toggle scoped
@@ -192,7 +202,8 @@ const DocRow = memo(({ doc, open, last, onToggle }) => {
 
   return (
     <li
-      className={last ? "" : "border-b border-rule"}
+      ref={focused ? rowRef : undefined}
+      className={`${last ? "" : "border-b border-rule"} ${focused ? FOCUS_RING : ""}`}
       style={open ? undefined : ROW_CV}
     >
       <button
@@ -338,7 +349,7 @@ const ClampedText = ({ text }) => {
 
 // ─── Ledger ───────────────────────────────────────────────────────────────────
 
-const SourcesLedger = ({ sources, hideHeader = false }) => {
+const SourcesLedger = ({ sources, focusKey, hideHeader = false }) => {
   // Derive everything once per `sources` identity. Grouping/sorting/URL parsing
   // are all hoisted out of the render path of individual rows.
   const { webSources, docs, totalChunks } = useMemo(() => {
@@ -350,6 +361,16 @@ const SourcesLedger = ({ sources, hideHeader = false }) => {
       totalChunks: docSrc.length,
     };
   }, [sources]);
+
+  // Resolve the citation-clicked source `key` to the id of its TOP-LEVEL row.
+  // Web rows carry their key as the id directly; a doc chunk's row is its
+  // parent document (`doc:<documentId>`).
+  const focusRowId = useMemo(() => {
+    if (!focusKey) return null;
+    const target = sources?.find((s) => s.key === focusKey);
+    if (!target) return null;
+    return target.type === "web" ? target.key : `doc:${target.documentId}`;
+  }, [focusKey, sources]);
 
   // A single Set of open ids drives expand state for top-level rows (chunk
   // expand state lives locally inside each DocRow). Functional updates keep the
@@ -363,6 +384,21 @@ const SourcesLedger = ({ sources, hideHeader = false }) => {
       return next;
     });
   }, []);
+
+  // When opened from a citation click, scroll the targeted row into view. The
+  // row is expanded by *deriving* its open state from focusRowId (see the
+  // `open` props below) rather than mutating openRows here — so the user can
+  // still collapse it afterward, and we avoid a setState-in-effect cascade.
+  // Re-runs whenever the focus target changes so a second chip re-focuses
+  // without the drawer closing in between.
+  const focusRef = useRef(null);
+  useEffect(() => {
+    if (!focusRowId) return;
+    const id = requestAnimationFrame(() =>
+      focusRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }),
+    );
+    return () => cancelAnimationFrame(id);
+  }, [focusRowId]);
 
   if (!sources?.length) return null;
 
@@ -404,8 +440,10 @@ const SourcesLedger = ({ sources, hideHeader = false }) => {
             <WebSourceRow
               key={src.id}
               source={src}
-              open={openRows.has(src.id)}
+              open={openRows.has(src.id) || src.id === focusRowId}
               last={i === webSources.length - 1 && !hasDoc}
+              focused={src.id === focusRowId}
+              rowRef={focusRef}
               onToggle={toggleRow}
             />
           ))}
@@ -418,8 +456,10 @@ const SourcesLedger = ({ sources, hideHeader = false }) => {
             <DocRow
               key={doc.id}
               doc={doc}
-              open={openRows.has(doc.id)}
+              open={openRows.has(doc.id) || doc.id === focusRowId}
               last={i === docs.length - 1}
+              focused={doc.id === focusRowId}
+              rowRef={focusRef}
               onToggle={toggleRow}
             />
           ))}

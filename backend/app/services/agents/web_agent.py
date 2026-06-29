@@ -31,6 +31,7 @@ import logging
 import threading
 import time
 from typing import AsyncIterator
+from urllib.parse import urlsplit
 
 from openai import BadRequestError
 from pymongo.database import Database
@@ -87,6 +88,37 @@ def _sse(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
 
+# Multi-part public suffixes we shouldn't mistake for the brand label. When the
+# registrable domain ends in one of these, the brand is the label *before* it
+# (e.g. ``abc.net.au`` → "Abc", ``bbc.co.uk`` → "Bbc").
+_COMPOUND_TLDS = (".net.au", ".com.au", ".co.uk", ".co.nz", ".com.br", ".co.in", ".org.uk")
+
+
+def _source_name(url: str) -> str:
+    """Derive a human-readable publisher name from a URL's host.
+
+    Tavily does not return a publisher field, so we prettify the registrable
+    domain: drop ``www.``, strip the TLD (handling common compound suffixes like
+    ``.net.au``), and title-case the remaining label. ``abc.net.au`` → "Abc",
+    ``theguardian.com`` → "Theguardian". Falls back to the raw host/URL when the
+    URL can't be parsed.
+    """
+    host = (urlsplit(url).hostname or url or "").lower()
+    if host.startswith("www."):
+        host = host[4:]
+    if not host:
+        return url
+    for suffix in _COMPOUND_TLDS:
+        if host.endswith(suffix):
+            host = host[: -len(suffix)]
+            break
+    else:
+        host = host.rsplit(".", 1)[0] if "." in host else host
+    # The brand is the last remaining dotted label (drops leading subdomains).
+    label = host.rsplit(".", 1)[-1]
+    return label.replace("-", " ").title() if label else url
+
+
 def _to_sources(results: list[dict]) -> list[dict]:
     """Map provider hits into the public WebSource citation dicts (with the
     ``type`` discriminator the UI branches on)."""
@@ -96,8 +128,11 @@ def _to_sources(results: list[dict]) -> list[dict]:
         snippet = content[:SNIPPET_MAX_CHARS].strip()
         if len(content) > SNIPPET_MAX_CHARS:
             snippet += "…"
-        sources.append({"type": "web", "title": r.get("title") or r.get("url", ""),
-                        "url": r.get("url", ""), "snippet": snippet})
+        url = r.get("url", "")
+        sources.append({"type": "web", "title": r.get("title") or url,
+                        "url": url, "snippet": snippet,
+                        "source_name": _source_name(url),
+                        "published_date": r.get("published_date") or ""})
     return sources
 
 

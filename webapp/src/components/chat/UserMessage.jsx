@@ -5,7 +5,7 @@ import { Check, ChevronDown, ChevronUp, Copy, Pencil } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
 
 // Grow the textarea with its content, from 1 row up to MAX_ROWS, then scroll.
-const MAX_ROWS = 5;
+const MAX_ROWS = 10;
 
 // Reset to a single row, then grow to fit content up to a MAX_ROWS cap derived
 // from the element's own line-height so it tracks the text styles.
@@ -137,7 +137,7 @@ const UserMessage = memo(({ message, isAuthenticated, canEdit, onEdit }) => {
                 ? { maxHeight: COLLAPSED_MAX_HEIGHT }
                 : undefined
             }
-            className="overflow-hidden whitespace-pre-wrap border border-rule bg-surface px-4 py-2.5 text-sm leading-relaxed text-ink"
+            className="overflow-hidden whitespace-pre-wrap border border-rule bg-surface p-2 text-sm leading-relaxed text-ink"
           >
             {message.text}
           </p>

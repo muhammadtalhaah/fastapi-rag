@@ -48,7 +48,9 @@ def test_search_happy_path_parses_results(monkeypatch):
     payload = {
         "results": [
             {"title": "Doc One", "url": "https://a.com", "content": "alpha", "score": 0.9},
-            {"title": "Doc Two", "url": "https://b.com", "content": "beta", "score": 0.5},
+            # published_date is carried through when the provider supplies it.
+            {"title": "Doc Two", "url": "https://b.com", "content": "beta", "score": 0.5,
+             "published_date": "2026-06-24"},
         ]
     }
     _patch_post(monkeypatch, lambda *a, **k: _FakeResponse(payload=payload))
@@ -56,8 +58,10 @@ def test_search_happy_path_parses_results(monkeypatch):
     results = web_search_client.search("q", max_results=5)
 
     assert results == [
-        {"title": "Doc One", "url": "https://a.com", "content": "alpha", "score": 0.9},
-        {"title": "Doc Two", "url": "https://b.com", "content": "beta", "score": 0.5},
+        {"title": "Doc One", "url": "https://a.com", "content": "alpha", "score": 0.9,
+         "published_date": ""},
+        {"title": "Doc Two", "url": "https://b.com", "content": "beta", "score": 0.5,
+         "published_date": "2026-06-24"},
     ]
 
 

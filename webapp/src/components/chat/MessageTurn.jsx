@@ -141,7 +141,11 @@ const MarkdownBody = memo(
 
     return (
       <div className={`mt-2 text-[0.95rem] ${bottomMargin}`}>
-        <MarkdownRenderer text={text} onCite={(n) => onCiteRef.current(n)} />
+        <MarkdownRenderer
+          text={text}
+          sources={sources}
+          onCite={(n) => onCiteRef.current(n)}
+        />
         {status === "streaming" ? (
           <span className="ml-1 inline-block h-2 w-2 animate-pulse rounded-full bg-brass align-middle" />
         ) : null}

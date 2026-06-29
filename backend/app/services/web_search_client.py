@@ -112,5 +112,8 @@ def _parse_results(payload: dict) -> list[dict]:
             "url": url,
             "content": (item.get("content") or "").strip(),
             "score": float(item.get("score") or 0.0),
+            # Tavily returns published_date only for some results (mainly news);
+            # carry it through when present so the UI can show recency.
+            "published_date": (item.get("published_date") or "").strip(),
         })
     return results

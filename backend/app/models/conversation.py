@@ -15,6 +15,9 @@ class ConversationSummary(BaseModel):
     """Lightweight row for the history list — no message bodies."""
     id: str
     title: str
+    # Pinned conversations sort above unpinned ones in the sidebar. Absent on
+    # conversations stored before pinning existed; defaults to unpinned.
+    pinned: bool = False
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
@@ -60,8 +63,10 @@ class ConversationDetail(BaseModel):
 
 
 class ConversationUpdate(BaseModel):
-    """Editable fields for a user-managed conversation."""
-    title: str = Field(min_length=1, max_length=80)
+    """Editable fields for a user-managed conversation. Both fields are optional
+    so the one PATCH route handles a rename, a pin-toggle, or both."""
+    title: str | None = Field(default=None, min_length=1, max_length=80)
+    pinned: bool | None = None
 
 
 class SearchSnippet(BaseModel):

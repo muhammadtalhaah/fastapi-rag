@@ -1,18 +1,18 @@
-import LNG from "@/language";
-import { ArrowUp, Square } from "lucide-react";
-import ComposerMenu from "./ComposerMenu";
-import { AppSelect } from "@/components/shared";
-import { DEFAULT_MODEL_ID, MODELS } from "@/config";
 import {
-  forwardRef,
-  useImperativeHandle,
-  useLayoutEffect,
   useRef,
   useState,
+  forwardRef,
+  useLayoutEffect,
+  useImperativeHandle,
 } from "react";
+import LNG from "@/language";
+import ComposerMenu from "./ComposerMenu";
+import { ArrowUp, Square } from "lucide-react";
+import { AppSelect } from "@/components/shared";
+import { DEFAULT_MODEL_ID, MODELS } from "@/config";
 
 // Grow the textarea with its content, from 1 row up to MAX_ROWS, then scroll.
-const MAX_ROWS = 5;
+const MAX_ROWS = 10;
 
 // Model picker options, derived once from config. Only one entry today; the
 // select scales to however many models become switchable.
@@ -30,6 +30,9 @@ const Composer = forwardRef(function Composer(
 ) {
   const [value, setValue] = useState("");
   const [modelId, setModelId] = useState(DEFAULT_MODEL_ID);
+  // Whether the model select's dropdown is open, so the selector can take a
+  // distinct background while active for clearer affordance.
+  const [modelOpen, setModelOpen] = useState(false);
   // Tracks focus of the textarea specifically (not `focus-within` on the card),
   // so the active ring only lights up for the input itself — clicking the "+"
   // menu or the model select must not make the composer look activated.
@@ -38,9 +41,13 @@ const Composer = forwardRef(function Composer(
 
   // Let the parent focus the input imperatively — e.g. on a new chat or once a
   // response finishes streaming — so the user can start typing without clicking.
-  useImperativeHandle(ref, () => ({
-    focus: () => textareaRef.current?.focus(),
-  }), []);
+  useImperativeHandle(
+    ref,
+    () => ({
+      focus: () => textareaRef.current?.focus(),
+    }),
+    [],
+  );
 
   // Auto-resize: reset to a single row, then grow to fit content up to a 5-row
   // cap derived from the element's own line-height so it tracks the text styles.
@@ -112,7 +119,10 @@ const Composer = forwardRef(function Composer(
             placement="topRight"
             variant="borderless"
             onChange={setModelId}
-            className="text-muted [&_.ant-select-selector]:border [&_.ant-select-selector]:border-transparent [&_.ant-select-selector]:transition-colors hover:[&_.ant-select-selector]:border-rule"
+            onOpenChange={setModelOpen}
+            className={`composer-model-select p-1 ${
+              modelOpen ? "bg-rule" : "hover:bg-rule/50"
+            }`}
             options={MODEL_OPTIONS}
             aria-label="Select model"
             popupMatchSelectWidth={false}
@@ -122,9 +132,9 @@ const Composer = forwardRef(function Composer(
               type="button"
               onClick={onStop}
               aria-label={LNG.eng.stop}
-              className="flex p-2 rounded-xl shrink-0 items-center justify-center bg-brass text-ground transition-colors hover:bg-brass/90"
+              className="flex p-1.5 rounded-xl shrink-0 items-center justify-center bg-brass text-ground transition-colors hover:bg-brass/90"
             >
-              <Square size={18} aria-hidden="true" fill="currentColor" />
+              <Square size={20} aria-hidden="true" fill="currentColor" />
             </button>
           ) : (
             <button
@@ -132,9 +142,9 @@ const Composer = forwardRef(function Composer(
               onClick={submit}
               aria-label="Send question"
               disabled={disabled || !value.trim()}
-              className="flex p-2 rounded-xl shrink-0 items-center justify-center bg-brass text-ground transition-colors hover:bg-brass/90 disabled:cursor-not-allowed disabled:bg-rule disabled:text-muted"
+              className="flex p-1.5 rounded-xl shrink-0 items-center justify-center bg-brass text-ground transition-colors hover:bg-brass/90 disabled:cursor-not-allowed disabled:bg-rule disabled:text-muted"
             >
-              <ArrowUp size={18} aria-hidden="true" />
+              <ArrowUp size={20} aria-hidden="true" />
             </button>
           )}
         </div>

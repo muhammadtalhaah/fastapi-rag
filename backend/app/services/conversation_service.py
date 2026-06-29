@@ -262,7 +262,7 @@ def rename_conversation(db: Database, conversation_id: str, user_id: str, title:
     updated = db.conversations.find_one_and_update(
         {"_id": oid, "user_id": user_id},
         {"$set": {"title": _normalize_generated_title(title, "") or "Untitled", "updated_at": _now()}},
-        projection={"title": 1, "created_at": 1, "updated_at": 1},
+        projection={"title": 1, "pinned": 1, "created_at": 1, "updated_at": 1},
         return_document=ReturnDocument.AFTER,
     )
     if not updated:
@@ -270,6 +270,33 @@ def rename_conversation(db: Database, conversation_id: str, user_id: str, title:
     return {
         "id": str(updated["_id"]),
         "title": updated.get("title") or "Untitled",
+        "pinned": updated.get("pinned", False),
+        "created_at": updated.get("created_at"),
+        "updated_at": updated.get("updated_at"),
+    }
+
+
+def set_pinned(db: Database, conversation_id: str, user_id: str, pinned: bool) -> dict | None:
+    """Pin or unpin a conversation and return the lightweight sidebar row.
+
+    Only flips the flag — ``updated_at`` is deliberately left untouched so a
+    conversation keeps its recency position within its (pinned/unpinned) group.
+    """
+    oid = _oid(conversation_id)
+    if not oid:
+        return None
+    updated = db.conversations.find_one_and_update(
+        {"_id": oid, "user_id": user_id},
+        {"$set": {"pinned": pinned}},
+        projection={"title": 1, "pinned": 1, "created_at": 1, "updated_at": 1},
+        return_document=ReturnDocument.AFTER,
+    )
+    if not updated:
+        return None
+    return {
+        "id": str(updated["_id"]),
+        "title": updated.get("title") or "Untitled",
+        "pinned": updated.get("pinned", False),
         "created_at": updated.get("created_at"),
         "updated_at": updated.get("updated_at"),
     }
@@ -281,15 +308,19 @@ def list_conversations(db: Database, user_id: str, limit: int = 100) -> list[dic
     cursor = (
         db.conversations.find(
             {"user_id": user_id},
-            {"title": 1, "created_at": 1, "updated_at": 1},
+            {"title": 1, "pinned": 1, "created_at": 1, "updated_at": 1},
         )
-        .sort("updated_at", DESCENDING)
+        # Pinned first, then newest first within each group. Docs missing the
+        # `pinned` field (stored before pinning existed) sort lowest, i.e. below
+        # pinned ones — exactly the unpinned behavior we want.
+        .sort([("pinned", DESCENDING), ("updated_at", DESCENDING)])
         .limit(limit)
     )
     return [
         {
             "id": str(doc["_id"]),
             "title": doc.get("title") or "Untitled",
+            "pinned": doc.get("pinned", False),
             "created_at": doc.get("created_at"),
             "updated_at": doc.get("updated_at"),
         }

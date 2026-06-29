@@ -2,6 +2,7 @@ import AppCard from "./AppCard";
 import { getInitials } from "@/helpers";
 import { useEffect, useRef, useState } from "react";
 import { Globe, LogOut, Moon, Settings, Sun } from "lucide-react";
+import { SettingsModal } from "@/components/settings";
 
 // The account control in the sidebar footer. The avatar + name/email row is a
 // button that opens a popover above it (the footer sits at the bottom of the
@@ -12,9 +13,10 @@ import { Globe, LogOut, Moon, Settings, Sun } from "lucide-react";
 // antd isn't a dependency in this project, and pulling it in for one menu would
 // also require bridging its theme system to the app's CSS-variable themes.
 //
-// Settings and Language are placeholders for now (no destination yet); Logout is
-// wired to the real auth action. `collapsed` mirrors the mini-rail behavior used
-// elsewhere in the sidebar.
+// Settings opens the SettingsModal (Account / Usage / Appearance); Language is a
+// placeholder for now (no destination yet); Logout is wired to the real auth
+// action. `collapsed` mirrors the mini-rail behavior used elsewhere in the
+// sidebar.
 const Avatar = ({ user }) =>
   user.profileUrl ? (
     <img
@@ -38,6 +40,7 @@ const AccountMenu = ({
   collapsedHide,
 }) => {
   const [open, setOpen] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const containerRef = useRef(null);
 
   // Close on Escape or a click outside the trigger+popover.
@@ -61,6 +64,7 @@ const AccountMenu = ({
     "flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-muted transition-colors";
 
   return (
+    <>
     <div
       ref={containerRef}
       onClick={() => setOpen((prev) => !prev)}
@@ -81,7 +85,11 @@ const AccountMenu = ({
             type="button"
             role="menuitem"
             className={itemClass}
-            onClick={() => setOpen(false)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setOpen(false);
+              setShowSettings(true);
+            }}
           >
             <Settings size={15} aria-hidden="true" className="shrink-0" />
             Settings
@@ -161,6 +169,16 @@ const AccountMenu = ({
         )}
       </button>
     </div>
+
+      {showSettings && (
+        <SettingsModal
+          onClose={() => setShowSettings(false)}
+          user={user}
+          theme={theme}
+          onToggleTheme={onToggleTheme}
+        />
+      )}
+    </>
   );
 };
 

@@ -50,6 +50,13 @@ class WebSource(BaseModel):
     title: str
     url: str
     snippet: str
+    # Human-readable publisher name derived from the host (e.g. "Abc" for
+    # abc.net.au). Defaults to "" for backward compatibility with turns
+    # persisted before this field existed; clients fall back to the domain.
+    source_name: str = ""
+    # Publication date when the provider supplies one (mainly news results),
+    # as an ISO-ish string. Empty when unknown; the UI hides it then.
+    published_date: str = ""
 
 
 class QueryResponse(BaseModel):

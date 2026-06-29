@@ -175,6 +175,9 @@ export function toSource(raw, index) {
       title: raw.title,
       url: raw.url,
       snippet: cleanSnippet(raw.snippet),
+      // Publisher name + publication date (when the backend supplies them).
+      sourceName: raw.source_name || "",
+      publishedDate: raw.published_date || "",
     };
   }
   return {

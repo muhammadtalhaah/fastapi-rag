@@ -12,10 +12,18 @@ import { useCallback, useEffect, useRef, useState, memo } from "react";
 // any MessageTurn. The parent passes a stable `openRef` (a ref to a setter)
 // so MessageTurn can trigger the drawer without causing list re-renders.
 const DrawerPortal = memo(({ openRef }) => {
-  const [sources, setSources] = useState(null);
+  // `payload` is { sources, focusKey } — focusKey marks the source a citation
+  // click targeted so the ledger can scroll it into view and highlight it.
+  const [payload, setPayload] = useState(null);
   // Expose the setter via ref so callers bypass React prop diffing entirely.
-  openRef.current = setSources;
-  return <SourcesDrawer sources={sources} onClose={() => setSources(null)} />;
+  openRef.current = setPayload;
+  return (
+    <SourcesDrawer
+      sources={payload?.sources}
+      focusKey={payload?.focusKey}
+      onClose={() => setPayload(null)}
+    />
+  );
 });
 DrawerPortal.displayName = "DrawerPortal";
 
@@ -165,8 +173,13 @@ const ChatPage = () => {
   // Ref to DrawerPortal's internal setter — calling it opens the drawer without
   // touching ChatPage state, so the message list never re-renders on open/close.
   const drawerOpenRef = useRef(null);
-  const openSources = useCallback((sources) => {
-    drawerOpenRef.current?.(sources);
+  // `focusIndex` (0-based) is set when the user clicks an inline citation chip;
+  // we translate it to the target source's stable key so the ledger can focus
+  // it. Opening from the footer "sources" button passes no index.
+  const openSources = useCallback((sources, focusIndex) => {
+    const focusKey =
+      focusIndex != null ? sources?.[focusIndex]?.key ?? null : null;
+    drawerOpenRef.current?.({ sources, focusKey });
   }, []);
   // The user-prompt count at the last dismissal. The nudge reappears once the
   // user has sent another full batch past this baseline; dismissing again moves

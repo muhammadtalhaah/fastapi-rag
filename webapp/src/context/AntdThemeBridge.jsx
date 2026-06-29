@@ -40,10 +40,18 @@ const sharedToken = {
 // hover surface and brass-tinted active state.
 const components = {
   Select: {
+    // NOTE: antd color-processes `optionSelectedBg`, so it can't parse our
+    // `rgb(var(--rule))` string and falls back to a stock dark grey — making the
+    // selected option unreadable in the light theme. The real fix lives in a CSS
+    // override in index.css (`.ant-select-item-option-selected`); we keep the
+    // token here too so the value is at least declared in one place.
     optionSelectedBg: cssVar("--rule"),
     optionActiveBg: cssVar("--rule"),
     selectorBg: "transparent",
-    colorBgElevated: cssVar("--surface"),
+    // The open dropdown is a popover, so give it the `--elevated` stock — a shade
+    // above `--surface` — so it reads as a distinct panel instead of blending
+    // into the composer card it floats over (also `--surface`).
+    colorBgElevated: cssVar("--elevated"),
     boxShadow: "none",
     boxShadowSecondary: "none",
   },

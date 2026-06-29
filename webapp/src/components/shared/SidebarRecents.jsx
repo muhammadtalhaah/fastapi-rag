@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Ellipsis, Pencil, Trash2 } from "lucide-react";
+import { Ellipsis, Pencil, Pin, PinOff, Trash2 } from "lucide-react";
 import { ROUTES } from "@/config/routes";
 import { useAuth } from "@/context";
 import { useConversations } from "@/hooks";
@@ -21,6 +21,7 @@ const SidebarRecents = ({ onNavigate }) => {
     deleteConversation,
     deletingId,
     renameConversation,
+    pinConversation,
   } = useConversations();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -46,6 +47,13 @@ const SidebarRecents = ({ onNavigate }) => {
     }
     deleteConversation(id);
     if (id === activeId) setSearchParams({});
+  };
+
+  const handlePin = (e, conversation) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setMenuOpenId(null);
+    pinConversation({ id: conversation.id, pinned: !conversation.pinned });
   };
 
   const startEditing = (conversation) => {
@@ -87,7 +95,7 @@ const SidebarRecents = ({ onNavigate }) => {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex-1 overflow-y-auto px-3 pb-2">
+      <div className="flex-1 overflow-y-auto px-3 pb-2 space-y-1">
         {conversations.map((c) => {
           const isActive = c.id === activeId;
           const isDeleting = c.id === deletingId;
@@ -97,7 +105,7 @@ const SidebarRecents = ({ onNavigate }) => {
             <div
               key={c.id}
               onClick={() => openConversation(c.id)}
-              className={`group flex cursor-pointer items-center gap-2 border p-1 transition-colors ${
+              className={`group flex cursor-pointer items-center gap-2 border p-1 px-2 transition-colors ${
                 isActive
                   ? "border-rule bg-ground text-ink"
                   : "border-transparent text-muted hover:border-rule hover:bg-ground/60 hover:text-ink"
@@ -129,7 +137,10 @@ const SidebarRecents = ({ onNavigate }) => {
                   />
                 </form>
               ) : (
-                <div className="min-w-0 flex-1 text-left" title={c.title}>
+                <div className="flex min-w-0 flex-1 items-center gap-1 text-left" title={c.title}>
+                  {c.pinned ? (
+                    <Pin size={12} className="shrink-0 text-brass" aria-label="Pinned" />
+                  ) : null}
                   <span className="block truncate text-xs">
                     {c.isGeneratingTitle ? (
                       <TypewriterText
@@ -160,6 +171,14 @@ const SidebarRecents = ({ onNavigate }) => {
                 </button>
                 {isMenuOpen ? (
                   <div className="absolute right-0 top-6 z-50 min-w-28 border border-rule bg-surface py-1 shadow-lg">
+                    <button
+                      type="button"
+                      onClick={(e) => handlePin(e, c)}
+                      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-ink transition-colors hover:bg-ground"
+                    >
+                      {c.pinned ? <PinOff size={12} /> : <Pin size={12} />}
+                      {c.pinned ? "Unpin" : "Pin"}
+                    </button>
                     <button
                       type="button"
                       onClick={(e) => {

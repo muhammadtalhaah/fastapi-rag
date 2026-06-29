@@ -158,3 +158,41 @@ body {
 .hljs-strong {
   font-weight: 600;
 }
+
+/* Ant Design Select dropdown — popup panel background.
+   Same root cause as the selected-option override below: antd color-processes
+   `colorBgElevated` through its palette math, which can't parse our
+   `rgb(var(--elevated))` string, so the open dropdown falls back to a
+   transparent/wrong fill and blends into the page behind it. Pin the panel
+   background to the live CSS variable so it reads as a distinct elevated panel
+   and tracks [data-theme]. */
+.ant-select-dropdown {
+  background-color: rgb(var(--elevated)) !important;
+}
+
+/* Ant Design Select dropdown — selected option.
+   The AntdThemeBridge feeds antd `rgb(var(--token))` strings. antd passes some
+   tokens through as raw CSS (background of the popup, etc.) but COLOR-PROCESSES
+   others through its palette math — and that math can't parse a CSS-variable
+   string, so it silently falls back to a stock default. `optionSelectedBg` is
+   one of those: it rendered as antd's default dark grey (#333), giving dark
+   text on a dark fill in the light theme (the selected model was invisible).
+   Pin both the fill and the label here, against the live CSS variables so they
+   track [data-theme] like everything else. */
+.ant-select-dropdown .ant-select-item-option-selected {
+  background-color: rgb(var(--rule)) !important;
+}
+.ant-select-dropdown .ant-select-item-option-selected .ant-select-item-option-content {
+  color: rgb(var(--ink));
+}
+
+/* Composer model picker — brass label.
+   The selected model name lives in `.ant-select-selection-item`, and antd's own
+   single-select rule sets its color, beating a Tailwind arbitrary-variant
+   utility on the wrapper (same specificity story as the overrides above). Pin it
+   to brass here with a selector specific enough to win, scoped to the composer's
+   `composer-model-select` class so other app selects are untouched. It tracks
+   [data-theme] via the live variable. */
+.composer-model-select.ant-select .ant-select-selection-item {
+  color: rgb(var(--brass)) !important;
+}

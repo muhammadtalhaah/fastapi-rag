@@ -1,8 +1,9 @@
-import { memo, useMemo, useRef, useCallback } from "react";
+import { memo, useMemo, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import { CopyButton } from "@/components/shared";
+import CitationChip from "./CitationChip";
 
 // ─── Raw <br> handling ──────────────────────────────────────────────────────
 //
@@ -24,48 +25,51 @@ const replaceBrTags = (text) =>
 
 // ─── Citation helpers ─────────────────────────────────────────────────────────
 
-const CITE_RE = /(\[\d+\])/g;
+// Matches a *run* of one or more citation markers — `[1]`, `[1][2]`, or
+// `[1] [2]` with incidental whitespace between them. Each run collapses into a
+// single grouped CitationChip ("Source name +N") rather than separate pills.
+const CITE_RUN_RE = /(\[\d+\](?:\s*\[\d+\])*)/g;
+const CITE_NUM_RE = /\[(\d+)\]/g;
 
-const renderCitePart = (part, key, onCiteRef) => {
-  const match = part.match(/^\[(\d+)\]$/);
-  if (!match) return part;
-  const n = parseInt(match[1], 10);
+// `citeCtx` is a ref holding `{ onCite, sources }` so the components map (built
+// once) can always read the latest callback + source list without changing
+// identity. Citation numbers are 1-based → map to `sources[n - 1]`.
+const renderCiteRun = (part, key, citeCtx) => {
+  const nums = [...part.matchAll(CITE_NUM_RE)].map((m) => parseInt(m[1], 10));
+  if (!nums.length) return part;
+  const ctx = citeCtx.current;
+  // Pair each citation number with its resolved source (may be null while the
+  // answer is still streaming and the sources event hasn't landed yet).
+  const items = nums.map((n) => ({ n, source: ctx?.sources?.[n - 1] ?? null }));
   return (
-    <sup key={key}>
-      <button
-        type="button"
-        onClick={() => onCiteRef.current(n)}
-        className="ml-0.5 cursor-pointer rounded px-0.5 font-mono text-[0.65em] text-brass underline underline-offset-2 transition-colors hover:text-brass/70"
-        aria-label={`Source ${n}`}
-      >
-        {n}
-      </button>
-    </sup>
+    <CitationChip
+      key={key}
+      items={items}
+      onActivate={(n) => ctx?.onCite(n)}
+    />
   );
 };
 
-// Split a text node first on the <br> sentinel, then parse citations within
+// Split a text node first on the <br> sentinel, then parse citation runs within
 // each segment, interleaving real <br/> elements between segments.
-const parseCitations = (text, onCiteRef) => {
+const parseCitations = (text, citeCtx) => {
   const segments = text.split(BR_SENTINEL);
   return segments.flatMap((segment, segIdx) => {
     const parts = segment
-      .split(CITE_RE)
-      .map((part, i) =>
-        renderCitePart(part, `${segIdx}-${i}`, onCiteRef),
-      );
+      .split(CITE_RUN_RE)
+      .map((part, i) => renderCiteRun(part, `${segIdx}-${i}`, citeCtx));
     return segIdx < segments.length - 1
       ? [...parts, <br key={`br-${segIdx}`} />]
       : parts;
   });
 };
 
-const injectCitations = (children, onCiteRef) => {
+const injectCitations = (children, citeCtx) => {
   if (Array.isArray(children))
     return children.map((child) =>
-      typeof child === "string" ? parseCitations(child, onCiteRef) : child,
+      typeof child === "string" ? parseCitations(child, citeCtx) : child,
     );
-  if (typeof children === "string") return parseCitations(children, onCiteRef);
+  if (typeof children === "string") return parseCitations(children, citeCtx);
   return children;
 };
 
@@ -79,14 +83,14 @@ const nodeText = (node) => {
   return "";
 };
 
-const makeMdComponents = (onCiteRef) => ({
+const makeMdComponents = (citeCtx) => ({
   p: ({ children }) => (
-    <p className="mb-3 last:mb-0 leading-relaxed text-ink">
-      {injectCitations(children, onCiteRef)}
+    <p className="mb-3 last:mb-0 leading-relaxed text-ink text-sm">
+      {injectCitations(children, citeCtx)}
     </p>
   ),
   li: ({ children }) => (
-    <li className="leading-relaxed">{injectCitations(children, onCiteRef)}</li>
+    <li className="leading-relaxed">{injectCitations(children, citeCtx)}</li>
   ),
   h1: ({ children }) => (
     <h1 className="mb-3 mt-5 border-b border-rule pb-1.5 text-3xl font-semibold tracking-tight text-ink first:mt-0">
@@ -173,12 +177,12 @@ const makeMdComponents = (onCiteRef) => ({
   ),
   th: ({ children }) => (
     <th className="border border-rule bg-surface px-3 py-1.5 text-left font-semibold text-ink">
-      {injectCitations(children, onCiteRef)}
+      {injectCitations(children, citeCtx)}
     </th>
   ),
   td: ({ children }) => (
     <td className="border border-rule px-3 py-1.5 align-top text-ink">
-      {injectCitations(children, onCiteRef)}
+      {injectCitations(children, citeCtx)}
     </td>
   ),
 });
@@ -191,17 +195,22 @@ const REHYPE_PLUGINS = [[rehypeHighlight, { detect: true, ignoreMissing: true }]
 // ─── MarkdownRenderer ─────────────────────────────────────────────────────────
 
 /**
- * Renders markdown text with syntax highlighting and clickable citation
- * superscripts ([1], [2] → calls onCite with the 1-based index).
+ * Renders markdown text with syntax highlighting and rich citation chips
+ * ([1], [2] → a hover-previewed pill; click calls onCite with the 1-based
+ * index). The `sources` array powers each chip's preview card.
  *
- * Memoized: only re-renders when `text` changes. The `onCite` callback is kept
- * in a ref so the components map is created once and never invalidated.
+ * Memoized: only re-renders when `text` or `sources` change. The `onCite`
+ * callback and `sources` are kept in a ref so the components map is created
+ * once and never invalidated.
  */
-const MarkdownRenderer = memo(({ text, onCite }) => {
-  const onCiteRef = useRef(null);
-  onCiteRef.current = useCallback((n) => onCite?.(n), [onCite]);
+const MarkdownRenderer = memo(({ text, sources, onCite }) => {
+  const citeCtx = useRef({ onCite, sources });
+  citeCtx.current = useMemo(
+    () => ({ onCite: (n) => onCite?.(n), sources }),
+    [onCite, sources],
+  );
 
-  const components = useMemo(() => makeMdComponents(onCiteRef), []);
+  const components = useMemo(() => makeMdComponents(citeCtx), []);
 
   // Swap literal <br> tags for a sentinel before parsing; the components map
   // turns the sentinel into real <br/> elements (see replaceBrTags above).

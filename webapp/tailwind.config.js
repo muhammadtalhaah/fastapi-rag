@@ -1,5 +1,9 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  // The app switches themes via a [data-theme] attribute on <html> (see
+  // index.css), not the OS prefers-color-scheme media query. Point Tailwind's
+  // `dark:` variant at that attribute so it tracks the in-app theme toggle.
+  darkMode: ["selector", '[data-theme="dark"]'],
   content: ["./index.html", "./src/**/*.{js,jsx}"],
   theme: {
     extend: {

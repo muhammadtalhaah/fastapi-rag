@@ -3,7 +3,7 @@ import { X } from "lucide-react";
 import SourcesLedger from "./SourcesLedger";
 import LNG from "@/language";
 
-const SourcesDrawer = ({ sources, onClose }) => {
+const SourcesDrawer = ({ sources, focusKey, onClose }) => {
   const open = Boolean(sources?.length);
 
   return (
@@ -24,7 +24,9 @@ const SourcesDrawer = ({ sources, onClose }) => {
         </div>
 
         <div className="flex-1 overflow-y-auto overscroll-contain [contain:content]">
-          {open ? <SourcesLedger sources={sources} hideHeader /> : null}
+          {open ? (
+            <SourcesLedger sources={sources} focusKey={focusKey} hideHeader />
+          ) : null}
         </div>
       </div>
     </AppDrawer>
