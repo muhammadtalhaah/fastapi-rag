@@ -5,11 +5,11 @@ import {
   useLayoutEffect,
   useImperativeHandle,
 } from "react";
-import LNG from "@/language";
 import ComposerMenu from "./ComposerMenu";
 import { ArrowUp, Square } from "lucide-react";
 import { AppSelect } from "@/components/shared";
 import { DEFAULT_MODEL_ID, MODELS } from "@/config";
+import { useTranslation } from "@/context";
 
 // Grow the textarea with its content, from 1 row up to MAX_ROWS, then scroll.
 const MAX_ROWS = 10;
@@ -28,6 +28,7 @@ const Composer = forwardRef(function Composer(
   { onSubmit, onStop, isGenerating, disabled, webSearch, onWebSearchChange },
   ref,
 ) {
+  const { t } = useTranslation();
   const [value, setValue] = useState("");
   const [modelId, setModelId] = useState(DEFAULT_MODEL_ID);
   // Whether the model select's dropdown is open, so the selector can take a
@@ -79,7 +80,7 @@ const Composer = forwardRef(function Composer(
   // controls (buttons, select). preventDefault keeps the click from stealing
   // focus before we hand it to the textarea.
   const focusOnMouseDown = (e) => {
-    if (e.target.closest("button, input, [role='combobox']")) return;
+    if (e.target.closest("button, input, [role='combobox'], .ant-select")) return;
     e.preventDefault();
     textareaRef.current?.focus();
   };
@@ -88,7 +89,7 @@ const Composer = forwardRef(function Composer(
     <div
       onMouseDown={focusOnMouseDown}
       className={`flex flex-col gap-2 rounded-3xl border bg-surface p-3 transition-colors ${
-        isFocused ? "border-retrieval" : "border-rule"
+        isFocused ? "border-primary" : "border-rule"
       } cursor-text`}
     >
       <textarea
@@ -99,14 +100,13 @@ const Composer = forwardRef(function Composer(
         onKeyDown={handleKeyDown}
         onFocus={() => setIsFocused(true)}
         onBlur={() => setIsFocused(false)}
-        placeholder={LNG.eng.askAnything}
+        placeholder={t("askAnything")}
         onChange={(e) => setValue(e.target.value)}
         className="resize-none bg-transparent px-2 py-1.5 text-sm leading-relaxed text-ink placeholder:text-muted focus:outline-none"
       />
 
       <div className="flex items-center gap-2">
         <ComposerMenu
-          disabled={disabled}
           webSearch={webSearch}
           onWebSearchChange={onWebSearchChange}
         />
@@ -115,7 +115,6 @@ const Composer = forwardRef(function Composer(
           <AppSelect
             size="small"
             value={modelId}
-            disabled={disabled}
             placement="topRight"
             variant="borderless"
             onChange={setModelId}
@@ -131,8 +130,8 @@ const Composer = forwardRef(function Composer(
             <button
               type="button"
               onClick={onStop}
-              aria-label={LNG.eng.stop}
-              className="flex p-1.5 rounded-xl shrink-0 items-center justify-center bg-brass text-ground transition-colors hover:bg-brass/90"
+              aria-label={t("stop")}
+              className="flex p-1.5 rounded-xl shrink-0 items-center justify-center bg-primary text-ground transition-colors hover:bg-primary/90"
             >
               <Square size={20} aria-hidden="true" fill="currentColor" />
             </button>
@@ -142,7 +141,7 @@ const Composer = forwardRef(function Composer(
               onClick={submit}
               aria-label="Send question"
               disabled={disabled || !value.trim()}
-              className="flex p-1.5 rounded-xl shrink-0 items-center justify-center bg-brass text-ground transition-colors hover:bg-brass/90 disabled:cursor-not-allowed disabled:bg-rule disabled:text-muted"
+              className="flex p-1.5 rounded-xl shrink-0 items-center justify-center bg-primary text-ground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-rule disabled:text-muted"
             >
               <ArrowUp size={20} aria-hidden="true" />
             </button>

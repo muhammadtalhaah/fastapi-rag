@@ -126,7 +126,7 @@ const SearchModal = ({ onClose }) => {
                     type="button"
                     onClick={loadMore}
                     disabled={isFetchingMore}
-                    className="border border-rule px-3 py-1.5 text-xs text-muted transition-colors hover:border-brass hover:text-ink disabled:opacity-50"
+                    className="border border-rule px-3 py-1.5 text-xs text-muted transition-colors hover:border-primary hover:text-ink disabled:opacity-50"
                   >
                     {isFetchingMore ? "Loading…" : "Load more"}
                   </button>

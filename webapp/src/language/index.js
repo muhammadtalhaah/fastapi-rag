@@ -1,3 +1,4 @@
 import LNG from "./applicationLanguage";
 
-export default LNG
+export { translate } from "./translate";
+export default LNG;

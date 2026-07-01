@@ -27,7 +27,7 @@ const DocumentRow = ({ document, onDelete, isDeleting }) => {
         <span className="inline-flex items-center gap-2 font-mono text-xs">
           <span
             className={`h-1.5 w-1.5 rounded-full ${
-              document.status === "indexed" ? "bg-retrieval" : "bg-rule"
+              document.status === "indexed" ? "bg-primary" : "bg-rule"
             }`}
             aria-hidden="true"
           />
@@ -45,7 +45,7 @@ const DocumentRow = ({ document, onDelete, isDeleting }) => {
             target="_blank"
             rel="noreferrer"
             aria-label={`Download ${document.filename}`}
-            className="inline-flex items-center justify-center p-1.5 text-muted transition-colors hover:text-brass"
+            className="inline-flex items-center justify-center p-1.5 text-muted transition-colors hover:text-primary"
           >
             <Download size={16} aria-hidden="true" />
           </a>

@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from "react";
-import { LogIn, X } from "lucide-react";
-import { AppButton } from "@/components/shared";
-import { useAuth } from "@/context";
 import GoogleButton from "./GoogleButton";
+import { useEffect, useState } from "react";
+import { useAuth, useTranslation } from "@/context";
+import { Eye, EyeOff, LogIn, X } from "lucide-react";
+import { AppButton, AppInput } from "@/components/shared";
 
 // Login dialog. Mirrors the ConfirmDelete modal conventions — fixed overlay,
 // hairline-ruled surface panel, Escape + backdrop-click to close, focus moved
@@ -11,12 +11,12 @@ import GoogleButton from "./GoogleButton";
 const LoginModal = ({ onClose }) => {
   const { login, isLoggingIn, loginError, resetLoginError, oauthError, clearOauthError } =
     useAuth();
+  const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const emailRef = useRef(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
-    emailRef.current?.focus();
     const onKey = (e) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -46,9 +46,6 @@ const LoginModal = ({ onClose }) => {
     }
   };
 
-  const inputClass =
-    "w-full border border-rule bg-ground px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-retrieval focus:outline-none";
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-ground/80 p-4"
@@ -63,20 +60,20 @@ const LoginModal = ({ onClose }) => {
       >
         <div className="flex items-start justify-between gap-4">
           <div>
-            <span className="font-mono text-xs uppercase tracking-[0.25em] text-brass">
-              Account
+            <span className="font-mono text-xs uppercase tracking-[0.25em] text-primary">
+              {t("accountLabel")}
             </span>
             <h2
               id="login-title"
               className="mt-2 font-display text-xl font-medium text-ink"
             >
-              Sign in
+              {t("signInTitle")}
             </h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t("closeLabel")}
             className="text-muted transition-colors hover:text-ink"
           >
             <X size={18} />
@@ -84,40 +81,48 @@ const LoginModal = ({ onClose }) => {
         </div>
 
         <p className="mt-2 text-sm leading-relaxed text-muted">
-          Sign in to save your conversations and access them across devices.
+          {t("signInDescription")}
         </p>
 
         <form className="mt-5 flex flex-col gap-4" onSubmit={submit}>
           <div className="flex flex-col gap-1.5">
             <label htmlFor="login-email" className="text-xs font-medium text-muted">
-              Email
+              {t("emailLabel")}
             </label>
-            <input
-              ref={emailRef}
+            <AppInput
               id="login-email"
               type="email"
               autoComplete="email"
-              required
+              autoFocus
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              className={inputClass}
+              placeholder={t("emailPlaceholder")}
+              className="w-full rounded-none bg-ground hover:bg-ground hover:border-primary text-sm text-ink placeholder:text-muted focus-within:border-primary"
             />
           </div>
 
           <div className="flex flex-col gap-1.5">
             <label htmlFor="login-password" className="text-xs font-medium text-muted">
-              Password
+              {t("passwordLabel")}
             </label>
-            <input
+            <AppInput
               id="login-password"
-              type="password"
+              type={showPassword ? "text" : "password"}
               autoComplete="current-password"
-              required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              className={inputClass}
+              className="w-full bg-ground hover:bg-ground hover:border-primary rounded-none text-sm text-ink placeholder:text-muted focus-within:border-primary"
+              suffix={
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? t("hidePassword") : t("showPassword")}
+                  className="text-muted transition-colors hover:text-ink"
+                >
+                  {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              }
             />
           </div>
 
@@ -129,11 +134,11 @@ const LoginModal = ({ onClose }) => {
 
           <div className="mt-1 flex justify-end gap-2">
             <AppButton variant="ghost" onClick={onClose} type="button">
-              Cancel
+              {t("cancel")}
             </AppButton>
             <AppButton type="submit" disabled={isLoggingIn}>
               <LogIn size={16} />
-              {isLoggingIn ? "Signing in…" : "Sign in"}
+              {isLoggingIn ? t("signingIn") : t("signIn")}
             </AppButton>
           </div>
         </form>
@@ -143,7 +148,7 @@ const LoginModal = ({ onClose }) => {
         <div className="my-5 flex items-center gap-3">
           <span className="h-px flex-1 bg-rule" />
           <span className="font-mono text-[0.65rem] uppercase tracking-[0.2em] text-muted">
-            or
+            {t("orDivider")}
           </span>
           <span className="h-px flex-1 bg-rule" />
         </div>

@@ -150,7 +150,15 @@ def login(body: LoginRequest, request: Request, response: Response):
     _set_session_cookies(response, raw_session_id, csrf_token)
 
     return LoginResponse(
-        user=AuthUserResponse(id=user_id, name=user["name"], email=user["email"], profile_url=user.get("profile_url")),
+        user=AuthUserResponse(
+            id=user_id,
+            name=user["name"],
+            email=user["email"],
+            profile_url=user.get("profile_url"),
+            nickname=user.get("nickname", ""),
+            work=user.get("work", ""),
+            instructions=user.get("instructions", ""),
+        ),
         csrf_token=csrf_token,
     )
 
@@ -181,8 +189,17 @@ def logout_all(response: Response, user: dict = Depends(get_current_user)):
 
 @router.get("/me", response_model=AuthUserResponse)
 def me(user: dict = Depends(get_current_user)):
-    """Return the currently authenticated user."""
-    return AuthUserResponse(id=user["id"], name=user["name"], email=user["email"], profile_url=user.get("profile_url"))
+    """Return the currently authenticated user, including editable profile fields."""
+    profile = user_service.get_user_profile(get_db(), user["id"]) or {}
+    return AuthUserResponse(
+        id=user["id"],
+        name=user["name"],
+        email=user["email"],
+        profile_url=profile.get("profile_url") or user.get("profile_url"),
+        nickname=profile.get("nickname", ""),
+        work=profile.get("work", ""),
+        instructions=profile.get("instructions", ""),
+    )
 
 
 @router.post(

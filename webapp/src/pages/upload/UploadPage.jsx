@@ -39,8 +39,8 @@ const UploadPage = () => {
       ) : null}
 
       {status === "done" ? (
-        <div className="flex flex-col items-center gap-4 border border-retrieval/30 bg-retrieval/5 px-6 py-12 text-center">
-          <CheckCircle2 size={34} aria-hidden="true" className="text-retrieval" />
+        <div className="flex flex-col items-center gap-4 border border-primary/30 bg-primary/5 px-6 py-12 text-center">
+          <CheckCircle2 size={34} aria-hidden="true" className="text-primary" />
           <div>
             <h2 className="font-display text-xl font-medium text-ink">
               Added to the collection

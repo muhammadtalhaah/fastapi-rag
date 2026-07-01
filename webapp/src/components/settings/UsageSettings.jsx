@@ -1,3 +1,4 @@
+import { useTranslation } from "@/context";
 import { DUMMY_USAGE } from "./settingsData";
 
 // Compact thousands/millions formatting for token counts: 1_284_530 -> "1.28M".
@@ -13,18 +14,19 @@ const fmtFull = (n) => n.toLocaleString("en-US");
 // a meter against the plan limit, and a per-model breakdown. All figures are
 // dummy data (DUMMY_USAGE) until a usage endpoint exists.
 const UsageSettings = () => {
+  const { t } = useTranslation();
   const { period, totalTokens, limit, breakdown, requests } = DUMMY_USAGE;
   const pct = Math.min(100, Math.round((totalTokens / limit) * 100));
 
   return (
     <div>
-      <h3 className="mb-2 font-mono text-xs uppercase tracking-[0.25em] text-brass">
-        Usage · {period}
+      <h3 className="mb-2 font-mono text-xs uppercase tracking-[0.25em] text-primary">
+        {t("usage")} · {period}
       </h3>
 
       {/* Headline total. */}
       <div className="border-b border-rule py-5">
-        <p className="text-xs font-medium text-muted">Total tokens used</p>
+        <p className="text-xs font-medium text-muted">{t("totalTokensUsed")}</p>
         <p className="mt-1 font-display text-3xl font-medium text-ink">
           {fmtTokens(totalTokens)}
           <span className="ml-2 align-baseline text-sm font-normal text-muted">
@@ -35,7 +37,7 @@ const UsageSettings = () => {
         {/* Meter against the plan limit. */}
         <div className="mt-3 h-2 w-full overflow-hidden bg-ground ring-1 ring-rule">
           <div
-            className="h-full bg-brass transition-[width]"
+            className="h-full bg-primary transition-[width]"
             style={{ width: `${pct}%` }}
             role="progressbar"
             aria-valuenow={pct}
@@ -51,7 +53,7 @@ const UsageSettings = () => {
       {/* Per-model breakdown. */}
       <div className="py-2">
         <p className="px-1 pb-1 pt-2 font-mono text-[0.6rem] uppercase tracking-[0.25em] text-muted">
-          By model
+          {t("byModel")}
         </p>
         <ul>
           {breakdown.map((row) => (
@@ -67,7 +69,7 @@ const UsageSettings = () => {
               </div>
               <div className="shrink-0 text-right">
                 <p className="text-sm tabular-nums text-ink">{fmtFull(row.tokens)}</p>
-                <p className="font-mono text-[0.6rem] text-muted">tokens</p>
+                <p className="font-mono text-[0.6rem] text-muted">{t("tokens")}</p>
               </div>
             </li>
           ))}

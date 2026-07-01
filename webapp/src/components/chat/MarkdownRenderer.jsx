@@ -83,14 +83,45 @@ const nodeText = (node) => {
   return "";
 };
 
+// Serialize a rendered <table>'s React node tree into tab-separated rows so the
+// clipboard text pastes cleanly into spreadsheets. Walks rows (<tr>) and cells
+// (<th>/<td>), joining cells with tabs and rows with newlines.
+const tableToTsv = (node) => {
+  const rows = [];
+  const visit = (n) => {
+    if (n == null || typeof n === "boolean") return;
+    if (Array.isArray(n)) return n.forEach(visit);
+    const type = n.props?.node?.tagName ?? n.type;
+    if (type === "tr") {
+      const cells = [];
+      const collectCells = (m) => {
+        if (m == null || typeof m === "boolean") return;
+        if (Array.isArray(m)) return m.forEach(collectCells);
+        const t = m.props?.node?.tagName ?? m.type;
+        if (t === "th" || t === "td") {
+          cells.push(nodeText(m.props?.children).replace(/\s+/g, " ").trim());
+          return;
+        }
+        if (m.props?.children) collectCells(m.props.children);
+      };
+      collectCells(n.props?.children);
+      rows.push(cells.join("\t"));
+      return;
+    }
+    if (n.props?.children) visit(n.props.children);
+  };
+  visit(node);
+  return rows.join("\n");
+};
+
 const makeMdComponents = (citeCtx) => ({
   p: ({ children }) => (
-    <p className="mb-3 last:mb-0 leading-relaxed text-ink text-sm">
+    <p className="mb-3 last:mb-0 leading-relaxed text-ink text-base">
       {injectCitations(children, citeCtx)}
     </p>
   ),
   li: ({ children }) => (
-    <li className="leading-relaxed">{injectCitations(children, citeCtx)}</li>
+    <li className="text-base !leading-tight">{injectCitations(children, citeCtx)}</li>
   ),
   h1: ({ children }) => (
     <h1 className="mb-3 mt-5 border-b border-rule pb-1.5 text-3xl font-semibold tracking-tight text-ink first:mt-0">
@@ -113,15 +144,15 @@ const makeMdComponents = (citeCtx) => ({
     </h4>
   ),
   ul: ({ children }) => (
-    <ul className="mb-3 ml-5 list-disc space-y-1 text-ink">{children}</ul>
+    <ul className="mb-3 ml-5 list-disc space-y-1 text-ink text-base !leading-tight">{children}</ul>
   ),
   ol: ({ children }) => (
-    <ol className="mb-3 ml-5 list-decimal space-y-1 text-ink">{children}</ol>
+    <ol className="mb-3 ml-5 list-decimal space-y-1 text-ink text-base">{children}</ol>
   ),
   strong: ({ children }) => (
-    <strong className="font-semibold text-ink">{children}</strong>
+    <strong className="font-semibold text-ink text-base">{children}</strong>
   ),
-  em: ({ children }) => <em className="italic">{children}</em>,
+  em: ({ children }) => <em className="italic text-base">{children}</em>,
   code: ({ className, children, ...props }) => {
     const isBlock = /\blanguage-/.test(className || "");
     if (isBlock)
@@ -131,7 +162,7 @@ const makeMdComponents = (citeCtx) => ({
         </code>
       );
     return (
-      <code className="rounded bg-surface px-1.5 py-0.5 font-mono text-[0.85em] text-brass">
+      <code className="rounded bg-surface px-1.5 py-0.5 font-mono text-[0.85em] text-primary">
         {children}
       </code>
     );
@@ -155,7 +186,7 @@ const makeMdComponents = (citeCtx) => ({
     );
   },
   blockquote: ({ children }) => (
-    <blockquote className="mb-3 border-l-2 border-brass pl-3 italic text-ink/70">
+    <blockquote className="mb-3 border-l-2 border-primary pl-3 italic text-ink/70">
       {children}
     </blockquote>
   ),
@@ -163,7 +194,7 @@ const makeMdComponents = (citeCtx) => ({
   a: ({ href, children }) => (
     <a
       href={href}
-      className="text-brass underline underline-offset-2"
+      className="text-primary underline underline-offset-2"
       target="_blank"
       rel="noreferrer"
     >
@@ -171,8 +202,13 @@ const makeMdComponents = (citeCtx) => ({
     </a>
   ),
   table: ({ children }) => (
-    <div className="mb-3 overflow-x-auto">
-      <table className="w-full border-collapse text-sm">{children}</table>
+    <div className="group relative mb-3">
+      <div className="absolute right-2 top-2 z-10 opacity-0 transition-opacity group-hover:opacity-100">
+        <CopyButton getText={() => tableToTsv(children)} title="Copy table" />
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse text-sm">{children}</table>
+      </div>
     </div>
   ),
   th: ({ children }) => (

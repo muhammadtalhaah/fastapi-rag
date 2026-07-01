@@ -4,6 +4,7 @@ import { Settings as SettingsIcon, Activity, Palette, X } from "lucide-react";
 import AccountSettings from "./AccountSettings";
 import UsageSettings from "./UsageSettings";
 import AppearanceSettings from "./AppearanceSettings";
+import { useTranslation } from "@/context";
 
 // Settings dialog opened from the account menu. Two-pane layout matching the
 // screenshots: a vertical nav rail on the left (Account / Usage / Appearance)
@@ -16,14 +17,16 @@ import AppearanceSettings from "./AppearanceSettings";
 // the containing block for the `fixed` overlay and clip the modal to the rail
 // instead of centering it on the viewport.
 //
-// UI only for now: panels render dummy data and there are no save endpoints.
+// Appearance is fully wired (applies live + syncs via PreferencesContext); the
+// Account and Usage panels still render dummy data pending their own endpoints.
 const TABS = [
-  { id: "account", label: "Account", Icon: SettingsIcon },
-  { id: "usage", label: "Usage", Icon: Activity },
-  { id: "appearance", label: "Appearance", Icon: Palette },
+  { id: "account", labelKey: "accountTab", Icon: SettingsIcon },
+  { id: "usage", labelKey: "usageTab", Icon: Activity },
+  { id: "appearance", labelKey: "appearanceTab", Icon: Palette },
 ];
 
-const SettingsModal = ({ onClose, user, theme, onToggleTheme }) => {
+const SettingsModal = ({ onClose, user }) => {
+  const { t } = useTranslation();
   const [active, setActive] = useState("account");
 
   useEffect(() => {
@@ -41,15 +44,15 @@ const SettingsModal = ({ onClose, user, theme, onToggleTheme }) => {
       onClick={onClose}
     >
       <div
-        className="flex h-[34rem] max-h-[88vh] w-full max-w-3xl overflow-hidden border border-rule bg-surface"
+        className="flex h-[45rem] max-h-[88vh] w-full max-w-4xl overflow-hidden border border-rule bg-surface"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Left nav rail. */}
         <nav className="flex w-48 shrink-0 flex-col border-r border-rule bg-ground/40 p-3">
-          <p className="px-2 pb-2 pt-1 font-mono text-[0.6rem] uppercase tracking-[0.3em] text-brass">
-            Settings
+          <p className="px-2 pb-2 pt-1 font-mono text-[0.6rem] uppercase tracking-[0.3em] text-primary">
+            {t("settingsTitle")}
           </p>
-          {TABS.map(({ id, label, Icon }) => {
+          {TABS.map(({ id, labelKey, Icon }) => {
             const selected = active === id;
             return (
               <button
@@ -64,7 +67,7 @@ const SettingsModal = ({ onClose, user, theme, onToggleTheme }) => {
                 }`}
               >
                 <Icon size={15} aria-hidden="true" className="shrink-0" />
-                {label}
+                {t(labelKey)}
               </button>
             );
           })}
@@ -77,12 +80,12 @@ const SettingsModal = ({ onClose, user, theme, onToggleTheme }) => {
               id="settings-title"
               className="font-display text-xl font-medium text-ink"
             >
-              {TABS.find((t) => t.id === active)?.label}
+              {t(TABS.find((tab) => tab.id === active)?.labelKey)}
             </h2>
             <button
               type="button"
               onClick={onClose}
-              aria-label="Close settings"
+              aria-label={t("closeSettings")}
               className="text-muted transition-colors hover:text-ink"
             >
               <X size={18} />
@@ -90,11 +93,17 @@ const SettingsModal = ({ onClose, user, theme, onToggleTheme }) => {
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto px-6 py-2">
-            {active === "account" && <AccountSettings user={user} />}
-            {active === "usage" && <UsageSettings />}
-            {active === "appearance" && (
-              <AppearanceSettings theme={theme} onToggleTheme={onToggleTheme} />
+            {active === "account" && (
+              // Key on the profile fields so a server-side change (save,
+              // avatar shuffle, cross-device edit) remounts the panel with
+              // fresh initial state instead of needing a syncing effect.
+              <AccountSettings
+                key={`${user?.name ?? ""}|${user?.nickname ?? ""}|${user?.work ?? ""}|${user?.instructions ?? ""}|${user?.profileUrl ?? ""}`}
+                user={user}
+              />
             )}
+            {active === "usage" && <UsageSettings />}
+            {active === "appearance" && <AppearanceSettings />}
           </div>
         </div>
       </div>

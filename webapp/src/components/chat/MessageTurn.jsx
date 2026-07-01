@@ -1,17 +1,17 @@
-import { Spinner, AppButton, CopyButton, AppTooltip } from "@/components/shared";
-import MarkdownRenderer from "./MarkdownRenderer";
-import UserMessage from "./UserMessage";
-import LNG from "@/language";
 import {
-  AlertTriangle,
-  BookOpen,
   Brain,
+  Globe,
+  BookOpen,
+  RefreshCw,
   ChevronLeft,
   ChevronRight,
-  Globe,
-  RefreshCw,
+  AlertTriangle,
 } from "lucide-react";
+import UserMessage from "./UserMessage";
+import MarkdownRenderer from "./MarkdownRenderer";
 import { forwardRef, memo, useCallback, useRef, useState } from "react";
+import { Spinner, AppButton, CopyButton, AppTooltip } from "@/components/shared";
+import { useTranslation } from "@/context";
 
 const MAX_FAVICONS = 3;
 
@@ -125,6 +125,7 @@ const MarkdownBody = memo(
     versionCount,
     onSelectVersion,
   }) => {
+    const { t } = useTranslation();
     // Keep onOpenSources in a ref so MarkdownRenderer's internal components map
     // never needs to change identity during streaming.
     const onCiteRef = useRef(null);
@@ -140,14 +141,14 @@ const MarkdownBody = memo(
       : "";
 
     return (
-      <div className={`mt-2 text-[0.95rem] ${bottomMargin}`}>
+      <div className={`font-chat text-[0.95rem] ${bottomMargin}`}>
         <MarkdownRenderer
           text={text}
           sources={sources}
           onCite={(n) => onCiteRef.current(n)}
         />
         {status === "streaming" ? (
-          <span className="ml-1 inline-block h-2 w-2 animate-pulse rounded-full bg-brass align-middle" />
+          <span className="ml-1 inline-block h-2 w-2 animate-pulse rounded-full bg-primary align-middle" />
         ) : null}
         {status === "done" ? (
           <div className="mt-3 flex items-center gap-1">
@@ -162,12 +163,12 @@ const MarkdownBody = memo(
               className="rounded-md p-1.5 hover:bg-surface"
             />
             {onRegenerate ? (
-              <AppTooltip title={LNG.eng.regenerate}>
+              <AppTooltip title={t("regenerate")}>
                 <button
                   type="button"
                   onClick={onRegenerate}
                   disabled={!canRegenerate}
-                  aria-label={LNG.eng.regenerate}
+                  aria-label={t("regenerate")}
                   className="inline-flex items-center rounded-md p-1.5 text-muted transition-colors hover:bg-surface hover:text-ink disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-muted"
                 >
                   <RefreshCw size={16} aria-hidden="true" />
@@ -175,7 +176,7 @@ const MarkdownBody = memo(
               </AppTooltip>
             ) : null}
             <AppTooltip
-              title={modelName ? LNG.eng.used + " " + modelName : LNG.eng.unknownModel}
+              title={modelName ? t("used") + " " + modelName : t("unknownModel")}
             >
               <div className="inline-flex cursor-default items-center rounded-md p-1.5 text-muted transition-colors hover:bg-sidebar hover:text-ink">
                 <Brain size={16} aria-hidden="true" />
@@ -185,7 +186,7 @@ const MarkdownBody = memo(
               <button
                 type="button"
                 onClick={() => onOpenSources(sources)}
-                className="flex items-center gap-1.5 border border-transparent px-2.5 py-1 font-mono text-xs text-muted transition-colors hover:border-brass hover:text-brass"
+                className="flex items-center gap-1.5 border border-transparent px-2.5 py-1 font-mono text-xs text-muted transition-colors hover:border-primary hover:text-primary"
               >
                 <FaviconStack sources={sources} />
                 {(() => {
@@ -209,7 +210,7 @@ MarkdownBody.displayName = "MarkdownBody";
 // ─── MessageTurn ──────────────────────────────────────────────────────────────
 
 const HIGHLIGHT_RING =
-  "rounded-sm ring-2 ring-brass/60 ring-offset-2 ring-offset-ground transition-[box-shadow] duration-700 motion-reduce:transition-none";
+  "rounded-sm ring-2 ring-primary/60 ring-offset-2 ring-offset-ground transition-[box-shadow] duration-700 motion-reduce:transition-none";
 
 const MessageTurn = memo(
   forwardRef(
@@ -259,7 +260,7 @@ const MessageTurn = memo(
 
           {/* Before any text arrives, a standalone blinking dot marks the start. */}
           {isLive && !hasText ? (
-            <span className="mt-1 inline-block h-2 w-2 animate-pulse rounded-full bg-brass" />
+            <span className="mt-1 inline-block h-2 w-2 animate-pulse rounded-full bg-primary" />
           ) : null}
 
           {(message.status === "streaming" || message.status === "done") &&
@@ -272,9 +273,7 @@ const MessageTurn = memo(
               modelName={message.modelName}
               onOpenSources={onOpenSources}
               onRegenerate={
-                isAuthenticated && onRegenerate
-                  ? () => onRegenerate(message.id)
-                  : null
+                isAuthenticated && onRegenerate ? () => onRegenerate(message.id) : null
               }
               canRegenerate={canRegenerate}
               activeVersion={message.activeVersion ?? 0}

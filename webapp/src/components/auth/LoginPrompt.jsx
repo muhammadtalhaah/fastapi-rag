@@ -15,7 +15,7 @@ const LoginPrompt = ({ onLogin, onDismiss }) => {
         <button
           type="button"
           onClick={onLogin}
-          className="!min-w-fit font-medium text-brass underline-offset-2 hover:underline"
+          className="!min-w-fit font-medium text-primary underline-offset-2 hover:underline"
         >
           Sign in
         </button>{" "}
@@ -25,7 +25,7 @@ const LoginPrompt = ({ onLogin, onDismiss }) => {
         <button
           type="button"
           onClick={onLogin}
-          className="min-w-fit flex items-center gap-1.5 border border-rule p-2 text-xs text-ink transition-colors hover:border-brass"
+          className="min-w-fit flex items-center gap-1.5 border border-rule p-2 text-xs text-ink transition-colors hover:border-primary"
         >
           <LogIn size={13} />
           Sign in

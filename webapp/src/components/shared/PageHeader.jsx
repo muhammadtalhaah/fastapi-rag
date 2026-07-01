@@ -5,7 +5,7 @@ const PageHeader = ({ eyebrow, title, lede, actions }) => {
     <header className="flex flex-col gap-4 border-b border-rule pb-6 sm_tablet:flex-row sm_tablet:items-end sm_tablet:justify-between">
       <div className="flex flex-col gap-2">
         {eyebrow ? (
-          <span className="font-mono text-xs uppercase tracking-[0.25em] text-brass">
+          <span className="font-mono text-xs uppercase tracking-[0.25em] text-primary">
             {eyebrow}
           </span>
         ) : null}

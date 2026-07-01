@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Globe, Info, Plus } from "lucide-react";
 import { AppCard, AppSwitch, AppTooltip } from "@/components/shared";
-import LNG from "@/language";
+import { useTranslation } from "@/context";
 
 const WEB_SEARCH_HELP =
   "When enabled, the assistant can search the web to provide up-to-date " +
@@ -13,6 +13,7 @@ const WEB_SEARCH_HELP =
 // explaining what it does. Mirrors the AccountMenu popover pattern (Escape /
 // outside-click to close, role="menu").
 const ComposerMenu = ({ webSearch, onWebSearchChange, disabled }) => {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const containerRef = useRef(null);
   const labelId = useId();
@@ -37,11 +38,11 @@ const ComposerMenu = ({ webSearch, onWebSearchChange, disabled }) => {
   return (
     <div ref={containerRef} className="relative cursor-pointer">
       {open ? (
-        <AppCard className="w-72 p-3" aria-label="Composer actions">
+        <AppCard className="w-72 p-3 !cursor-default" aria-label="Composer actions">
           <div className="flex items-center gap-2.5">
             <Globe size={16} aria-hidden="true" className="shrink-0 text-muted" />
             <span id={labelId} className="text-sm font-medium text-ink">
-              {LNG.eng.webSearch}
+              {t("webSearch")}
             </span>
             <AppTooltip title={WEB_SEARCH_HELP} placement="top">
               <button
@@ -79,7 +80,7 @@ const ComposerMenu = ({ webSearch, onWebSearchChange, disabled }) => {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="More actions"
-        className="flex rounded-xl h-9 w-9 shrink-0 items-center justify-center border border-transparent text-muted transition-colors hover:border-retrieval hover:text-ink focus:outline-none focus-visible:border-retrieval disabled:cursor-not-allowed disabled:opacity-50"
+        className={`flex rounded-xl h-9 w-9 shrink-0 items-center justify-center border border-transparent text-muted transition-colors hover:border-primary hover:text-ink focus:outline-none focus-visible:border-primary disabled:cursor-not-allowed disabled:opacity-50 ${open ? "!border-primary" : "border-transparent"}`}
       >
         <Plus size={18} aria-hidden="true" />
       </button>

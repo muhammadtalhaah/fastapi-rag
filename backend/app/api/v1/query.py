@@ -1,8 +1,9 @@
 import json
 import logging
 
-from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
+from api.deps import get_optional_user
 from models.query import QueryRequest, QueryResponse
 from services import (
     auth_session_service,
@@ -96,7 +97,11 @@ def end_session(session_id: str):
 
 
 @router.post("/stream")
-async def query_documents_stream(body: QueryRequest, request: Request):
+async def query_documents_stream(
+    body: QueryRequest,
+    request: Request,
+    user: dict | None = Depends(get_optional_user),
+):
     db = get_db()
     _validate_input(body)
     client_ip = request.client.host if request.client else None
@@ -114,6 +119,7 @@ async def query_documents_stream(body: QueryRequest, request: Request):
             async for frame in orchestrator_service.run_stream(
                 db, body.question, top_k=body.top_k, mode=body.mode,
                 web_search=body.web_search, session=session, client_ip=client_ip,
+                user=user,
             ):
                 yield frame
         except ValueError as e:
@@ -259,6 +265,7 @@ async def query_websocket(websocket: WebSocket):
                 async for frame in orchestrator_service.run_stream(
                     db, body.question, top_k=body.top_k, mode=body.mode,
                     web_search=body.web_search, session=session, client_ip=client_ip,
+                    user=user,
                 ):
                     event_match = None
                     data_match = None

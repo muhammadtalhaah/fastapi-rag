@@ -11,7 +11,7 @@ function highlight(text, query) {
   const matcher = new RegExp(`^(?:${terms.join("|")})$`, "i");
   return parts.map((part, i) =>
     matcher.test(part) ? (
-      <mark key={i} className="bg-brass/25 text-ink">
+      <mark key={i} className="bg-primary/25 text-ink">
         {part}
       </mark>
     ) : (
@@ -54,7 +54,7 @@ const SearchResultItem = ({ result, query, onSelect }) => (
                 className="mt-0.5 shrink-0 text-rule"
               />
               <span className="min-w-0 flex-1 text-xs leading-relaxed text-muted line-clamp-2">
-                <span className="mr-1.5 font-mono text-[0.6rem] uppercase tracking-wider text-brass">
+                <span className="mr-1.5 font-mono text-[0.6rem] uppercase tracking-wider text-primary">
                   {snippet.role === "user" ? "You" : "Answer"}
                 </span>
                 {highlight(snippet.snippet, query)}

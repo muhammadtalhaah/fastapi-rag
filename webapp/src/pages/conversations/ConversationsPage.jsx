@@ -4,20 +4,16 @@ import { MessageSquareText, Plus, RotateCw, Search, Trash2, X } from "lucide-rea
 import { PageHeader, StateBlock, AppButton, AppSelect } from "@/components/shared";
 import { ChatRow, ConfirmBulkDelete } from "@/components/chats";
 import { ROUTES } from "@/config";
-import LNG from "@/language";
+import { useTranslation } from "@/context";
 import { useConversations } from "@/hooks";
-
-const FILTER_OPTIONS = [
-  { value: "all", label: LNG.eng.filterAll },
-  { value: "pinned", label: LNG.eng.filterPinned },
-];
 
 // The Chats manager: a full-page view of the user's conversation history with a
 // filter (All / Pinned), title search, a multi-select "Select chats" mode for
 // bulk deletion, and a New chat shortcut. The route is auth-gated, so the list
 // owner is always signed in. Filter and search persist in URL query params so
 // the view is shareable and survives reload.
-const ChatsPage = () => {
+const ConversationsPage = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const {
     conversations,
@@ -31,6 +27,14 @@ const ChatsPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const filter = searchParams.get("filter") === "pinned" ? "pinned" : "all";
   const search = searchParams.get("q") ?? "";
+
+  const FILTER_OPTIONS = useMemo(
+    () => [
+      { value: "all", label: t("filterAll") },
+      { value: "pinned", label: t("filterPinned") },
+    ],
+    [t],
+  );
 
   // Selection mode is transient UI, not route state — selecting chats isn't
   // something to deep-link or restore on reload.
@@ -77,7 +81,9 @@ const ChatsPage = () => {
   const allVisibleSelected =
     visibleChats.length > 0 && visibleChats.every((c) => selectedIds.has(c.id));
   const toggleSelectAll = () => {
-    setSelectedIds(allVisibleSelected ? new Set() : new Set(visibleChats.map((c) => c.id)));
+    setSelectedIds(
+      allVisibleSelected ? new Set() : new Set(visibleChats.map((c) => c.id)),
+    );
   };
 
   const confirmDelete = () => {
@@ -95,12 +101,12 @@ const ChatsPage = () => {
     <div className="flex flex-col gap-6">
       <PageHeader
         eyebrow="02 · Chats"
-        title={LNG.eng.chats}
+        title={t("chats")}
         lede="Your conversation history. Search, filter, reopen, or clear out chats you no longer need."
         actions={
           <AppButton onClick={() => navigate(ROUTES.CHAT)}>
             <Plus size={16} aria-hidden="true" />
-            {LNG.eng.newChat}
+            {t("newChat")}
           </AppButton>
         }
       />
@@ -118,7 +124,7 @@ const ChatsPage = () => {
         ) : (
           <label className="flex items-center gap-2 text-sm text-muted">
             <span className="font-mono text-xs uppercase tracking-wide">
-              {LNG.eng.filterBy}
+              {t("filterBy")}
             </span>
             <AppSelect
               size="middle"
@@ -146,7 +152,7 @@ const ChatsPage = () => {
               </AppButton>
               <AppButton variant="ghost" onClick={exitSelectMode}>
                 <X size={16} aria-hidden="true" />
-                {LNG.eng.cancel}
+                {t("cancel")}
               </AppButton>
             </>
           ) : (
@@ -155,7 +161,7 @@ const ChatsPage = () => {
               disabled={conversations.length === 0}
               onClick={() => setSelectMode(true)}
             >
-              {LNG.eng.selectChats}
+              {t("selectChats")}
             </AppButton>
           )}
         </div>
@@ -167,7 +173,7 @@ const ChatsPage = () => {
         <input
           type="search"
           value={search}
-          placeholder={LNG.eng.searchChats}
+          placeholder={t("searchChats")}
           onChange={(e) => setParam("q", e.target.value)}
           aria-label="Search chats"
           className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-muted"
@@ -203,13 +209,13 @@ const ChatsPage = () => {
             conversations.length === 0 ? (
               <AppButton onClick={() => navigate(ROUTES.CHAT)}>
                 <Plus size={16} aria-hidden="true" />
-                {LNG.eng.newChat}
+                {t("newChat")}
               </AppButton>
             ) : null
           }
         />
       ) : (
-        <div className="border border-rule">
+        <div className="">
           {visibleChats.map((chat) => (
             <ChatRow
               key={chat.id}
@@ -235,4 +241,4 @@ const ChatsPage = () => {
   );
 };
 
-export default ChatsPage;
+export default ConversationsPage;

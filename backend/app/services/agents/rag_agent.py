@@ -25,10 +25,12 @@ def stream(
     session: dict | None,
     request_id: str,
     client_ip: str | None = None,
+    user: dict | None = None,
 ) -> AsyncIterator[str]:
     """Answer ``question`` from ingested documents via the RAG pipeline.
 
     ``request_id`` and ``client_ip`` are accepted for interface uniformity; RAG
-    mints its own id and does not rate-limit.
+    mints its own id and does not rate-limit. ``user`` (the resolved profile, or
+    None for guests) personalizes the system prompt.
     """
-    return query_service.query_stream(db, question, top_k, session)
+    return query_service.query_stream(db, question, top_k, session, user)

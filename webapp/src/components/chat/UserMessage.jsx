@@ -1,8 +1,8 @@
+import { useTranslation } from "@/context";
+import { memo, useEffect, useRef, useState } from "react";
 import { AppButton, AppTooltip } from "@/components/shared";
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
-import LNG from "@/language";
 import { Check, ChevronDown, ChevronUp, Copy, Pencil } from "lucide-react";
-import { memo, useEffect, useRef, useState } from "react";
 
 // Grow the textarea with its content, from 1 row up to MAX_ROWS, then scroll.
 const MAX_ROWS = 10;
@@ -30,6 +30,7 @@ const autoResize = (el) => {
 const COLLAPSED_MAX_HEIGHT = 224;
 
 const UserMessage = memo(({ message, isAuthenticated, canEdit, onEdit }) => {
+  const { t } = useTranslation();
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(message.text);
   const [expanded, setExpanded] = useState(false);
@@ -91,7 +92,7 @@ const UserMessage = memo(({ message, isAuthenticated, canEdit, onEdit }) => {
   if (isEditing) {
     return (
       <div className="flex justify-end">
-        <div className="w-full max-w-[85%] rounded-3xl border border-rule bg-surface px-4 py-3 transition-colors focus-within:border-retrieval">
+        <div className="w-full max-w-[85%] rounded-3xl border border-rule bg-surface px-4 py-3 transition-colors focus-within:border-primary">
           <textarea
             ref={textareaRef}
             value={draft}
@@ -102,7 +103,7 @@ const UserMessage = memo(({ message, isAuthenticated, canEdit, onEdit }) => {
             onKeyDown={handleKeyDown}
             rows={1}
             className="w-full resize-none !border-none bg-transparent text-sm leading-relaxed text-ink !outline-none focus:!ring-0"
-            aria-label={LNG.eng.editMessage}
+            aria-label={t("editMessage")}
           />
           <div className="mt-2 flex justify-end gap-2">
             <AppButton
@@ -110,7 +111,7 @@ const UserMessage = memo(({ message, isAuthenticated, canEdit, onEdit }) => {
               onClick={cancelEdit}
               className="!px-3 !py-1 !text-xs"
             >
-              {LNG.eng.cancel}
+              {t("cancel")}
             </AppButton>
             <AppButton
               variant="primary"
@@ -118,7 +119,7 @@ const UserMessage = memo(({ message, isAuthenticated, canEdit, onEdit }) => {
               disabled={!canEdit || !draft.trim()}
               className="!px-3 !py-1 !text-xs"
             >
-              {LNG.eng.save}
+              {t("save")}
             </AppButton>
           </div>
         </div>
@@ -133,11 +134,9 @@ const UserMessage = memo(({ message, isAuthenticated, canEdit, onEdit }) => {
           <p
             ref={bubbleRef}
             style={
-              !expanded && isOverflowing
-                ? { maxHeight: COLLAPSED_MAX_HEIGHT }
-                : undefined
+              !expanded && isOverflowing ? { maxHeight: COLLAPSED_MAX_HEIGHT } : undefined
             }
-            className="overflow-hidden whitespace-pre-wrap border border-rule bg-surface p-2 text-sm leading-relaxed text-ink"
+            className="overflow-hidden whitespace-pre-wrap border border-rule bg-surface p-2 font-chat text-base leading-relaxed text-ink"
           >
             {message.text}
           </p>
@@ -151,7 +150,7 @@ const UserMessage = memo(({ message, isAuthenticated, canEdit, onEdit }) => {
             onClick={() => setExpanded((v) => !v)}
             className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-muted transition-colors hover:text-ink"
           >
-            {expanded ? LNG.eng.showLess : LNG.eng.showMore}
+            {expanded ? t("showLess") : t("showMore")}
             {expanded ? (
               <ChevronUp size={14} aria-hidden="true" />
             ) : (
@@ -162,13 +161,13 @@ const UserMessage = memo(({ message, isAuthenticated, canEdit, onEdit }) => {
       </div>
       {isAuthenticated ? (
         <div className="flex items-center gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
-          <AppTooltip title={copied ? LNG.eng.copied : LNG.eng.copyMessage}>
+          <AppTooltip title={copied ? t("copied") : t("copyMessage")}>
             <button
               type="button"
               onClick={() => copy(message.text)}
-              aria-label={LNG.eng.copyMessage}
+              aria-label={t("copyMessage")}
               className={`inline-flex items-center rounded-md p-1.5 transition-colors hover:bg-surface ${
-                copied ? "text-brass" : "text-muted hover:text-ink"
+                copied ? "text-primary" : "text-muted hover:text-ink"
               }`}
             >
               {copied ? (
@@ -178,12 +177,12 @@ const UserMessage = memo(({ message, isAuthenticated, canEdit, onEdit }) => {
               )}
             </button>
           </AppTooltip>
-          <AppTooltip title={LNG.eng.editMessage}>
+          <AppTooltip title={t("editMessage")}>
             <button
               type="button"
               onClick={openEditor}
               disabled={!canEdit}
-              aria-label={LNG.eng.editMessage}
+              aria-label={t("editMessage")}
               className="inline-flex items-center rounded-md p-1.5 text-muted transition-colors hover:bg-surface hover:text-ink disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-muted"
             >
               <Pencil size={15} aria-hidden="true" />

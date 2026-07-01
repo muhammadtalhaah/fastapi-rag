@@ -19,11 +19,19 @@ export default {
         retrieval: "rgb(var(--retrieval) / <alpha-value>)",
         brass: "rgb(var(--brass) / <alpha-value>)",
         danger: "rgb(var(--danger) / <alpha-value>)",
+        // Alias for the currently selected accent (`--brass`, re-pointed by
+        // [data-accent] in index.css). Prefer `primary` over `brass` in new
+        // code so components stay correct regardless of which token the user
+        // has chosen as their accent.
+        primary: "rgb(var(--brass) / <alpha-value>)",
       },
       fontFamily: {
         display: ['"Fraunces"', "serif"],
         body: ['"Inter"', "system-ui", "sans-serif"],
         mono: ['"JetBrains Mono"', "ui-monospace", "monospace"],
+        // User-selectable chat font. Resolves to --chat-font, which the
+        // [data-font] rules in index.css repoint per the Appearance setting.
+        chat: "var(--chat-font)",
       },
       screens: {
         sm_tablet: "600px",

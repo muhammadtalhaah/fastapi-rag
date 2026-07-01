@@ -16,7 +16,7 @@ const Spinner = ({ size = 18, label }) => {
         <circle cx="12" cy="12" r="9" stroke="rgb(var(--rule))" strokeWidth="2" />
         <path
           d="M21 12a9 9 0 0 0-9-9"
-          stroke="rgb(var(--retrieval))"
+          stroke="rgb(var(--brass))"
           strokeWidth="2"
           strokeLinecap="round"
         />

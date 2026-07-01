@@ -69,6 +69,7 @@ async def run_stream(
     session: dict | None = None,
     request_id: str | None = None,
     client_ip: str | None = None,
+    user: dict | None = None,
     classifier: Callable[[str], str | None] | None = None,
 ) -> AsyncIterator[str]:
     """Route ``question`` to an agent and yield its SSE frames.
@@ -132,7 +133,7 @@ async def run_stream(
     yield _sse("model", {"name": query_service.MODEL_DISPLAY_NAME})
 
     async for frame in agent["stream"](
-        db, question, top_k=top_k, session=session, request_id=rid, client_ip=client_ip
+        db, question, top_k=top_k, session=session, request_id=rid, client_ip=client_ip, user=user
     ):
         yield frame
     logger.info(

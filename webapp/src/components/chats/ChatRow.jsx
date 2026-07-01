@@ -31,7 +31,7 @@ const ChatRow = ({ chat, selectMode, isSelected, onOpen, onToggleSelect }) => {
         <span
           aria-hidden="true"
           className={`grid h-4 w-4 shrink-0 place-items-center border transition-colors ${
-            isSelected ? "border-brass bg-brass text-ground" : "border-rule"
+            isSelected ? "border-primary bg-primary text-ground" : "border-rule"
           }`}
         >
           {isSelected ? <Check size={12} strokeWidth={3} /> : null}
@@ -40,7 +40,7 @@ const ChatRow = ({ chat, selectMode, isSelected, onOpen, onToggleSelect }) => {
 
       <div className="flex min-w-0 flex-1 items-center gap-2" title={chat.title}>
         {chat.pinned ? (
-          <Pin size={13} className="shrink-0 text-brass" aria-label="Pinned" />
+          <Pin size={13} className="shrink-0 text-primary" aria-label="Pinned" />
         ) : null}
         <span className="truncate text-sm text-ink">{chat.title}</span>
       </div>

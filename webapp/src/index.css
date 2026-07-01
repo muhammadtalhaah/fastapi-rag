@@ -19,7 +19,7 @@
   --muted: 138 146 156; /* #8A929C */
   --retrieval: 79 209 197; /* #4FD1C5 */
   --brass: 201 162 39; /* #C9A227 */
-  --danger: 224 122 95; /* #E07A5F */
+  --danger: 139 0 0; /* #8B0000 */
 
   /* hljs literals tuned to the dark palette (see syntax theme below). */
   --code-number: 217 184 95; /* lighter brass for literals */
@@ -44,6 +44,38 @@
   --code-title: 21 122 145; /* darker teal for identifiers */
 }
 
+/* Accent override. The app's accent is the `--brass` token (call-numbers,
+   selected states, primary actions, the AntdThemeBridge colorPrimary). The
+   Appearance > Accent control sets [data-accent] on <html>; each value below
+   re-points --brass at another palette token so the whole UI recolors without
+   touching any component. "brass" is the default and needs no rule. Values are
+   theme-aware: the per-theme blocks above already define the right shade of each
+   token, so we just alias --brass to it and it tracks [data-theme] for free. */
+:root[data-accent="retrieval"] {
+  --brass: var(--retrieval);
+}
+:root[data-accent="danger"] {
+  --brass: var(--danger);
+}
+:root[data-accent="ink"] {
+  --brass: var(--ink);
+}
+
+/* App font. The Appearance > Font control sets [data-font] on <html>; body
+   text app-wide resolves to var(--chat-font) (the `body` rule below, plus the
+   `font-chat` utility on chat content). Headings (font-display / Fraunces) and
+   intentional mono usage (font-mono) stay fixed. Default is the display serif
+   (Fraunces). */
+:root {
+  --chat-font: "Fraunces", serif;
+}
+:root[data-font="sans"] {
+  --chat-font: "Inter", system-ui, sans-serif;
+}
+:root[data-font="mono"] {
+  --chat-font: "JetBrains Mono", ui-monospace, monospace;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -58,7 +90,7 @@ body {
   margin: 0;
   background-color: rgb(var(--ground));
   color: rgb(var(--ink));
-  font-family: "Inter", system-ui, sans-serif;
+  font-family: var(--chat-font);
   -webkit-font-smoothing: antialiased;
   /* faint ledger grain so the dark ground reads as paper, not void */
   background-image: radial-gradient(
@@ -69,7 +101,7 @@ body {
 }
 
 ::selection {
-  background: rgb(var(--retrieval) / 0.28);
+  background: rgb(var(--brass) / 0.28);
 }
 
 * {
@@ -86,7 +118,7 @@ body {
 }
 
 :focus-visible {
-  outline: 2px solid rgb(var(--retrieval));
+  outline: 2px solid rgb(var(--brass));
   outline-offset: 2px;
 }
 
@@ -168,6 +200,43 @@ body {
    and tracks [data-theme]. */
 .ant-select-dropdown {
   background-color: rgb(var(--elevated)) !important;
+  /* A distinct elevated panel: hairline ring + comfortable rounding + a soft
+     drop so it reads as a card floating over the page, matching the Dropdown
+     popup treatment in AntdThemeBridge. */
+  border: 1px solid rgb(var(--rule)) !important;
+  border-radius: 10px !important;
+  padding: 4px !important;
+  box-shadow: 0 8px 24px -8px rgb(0 0 0 / 0.35) !important;
+}
+
+/* Option rows — give each row breathing room and a clean full-width hover/active
+   highlight (the `--rule` wash) instead of antd's stock tint. */
+.ant-select-dropdown .ant-select-item-option {
+  border-radius: 6px !important;
+  padding: 7px 12px !important;
+  color: rgb(var(--ink)) !important;
+}
+.ant-select-dropdown .ant-select-item-option-active:not(.ant-select-item-option-disabled) {
+  background-color: rgb(var(--rule) / 0.5) !important;
+}
+.ant-select-dropdown .ant-select-item-option-disabled {
+  color: rgb(var(--muted)) !important;
+  opacity: 0.55;
+}
+
+/* Selected-option check — antd renders the tick in `…-option-state`; tint it the
+   accent (brass) so the current choice reads like the target design. */
+.ant-select-dropdown .ant-select-item-option-selected .ant-select-item-option-state {
+  color: rgb(var(--brass)) !important;
+}
+
+/* Composer model picker — match the dropdown panel to the input background.
+   The composer's textarea reads as `--surface` (the card it sits on), so the
+   open model dropdown is pinned to the same fill instead of the default
+   `--elevated`, scoped via `composer-model-dropdown` so other app selects keep
+   the elevated panel. Same `!important` reason as the base rule above. */
+.ant-select-dropdown.composer-model-dropdown {
+  background-color: rgb(var(--surface)) !important;
 }
 
 /* Ant Design Select dropdown — selected option.
@@ -177,13 +246,23 @@ body {
    string, so it silently falls back to a stock default. `optionSelectedBg` is
    one of those: it rendered as antd's default dark grey (#333), giving dark
    text on a dark fill in the light theme (the selected model was invisible).
-   Pin both the fill and the label here, against the live CSS variables so they
-   track [data-theme] like everything else. */
-.ant-select-dropdown .ant-select-item-option-selected {
-  background-color: rgb(var(--rule)) !important;
+   Keep the selected row flat (no box) — it's marked by the brass check on the
+   right instead — with the same `--rule` wash as the hover state so the whole
+   menu reads as one clean list. Pin the label to `--ink` against the live
+   variable so it tracks [data-theme]. */
+.ant-select-dropdown .ant-select-item-option-selected:not(.ant-select-item-option-disabled) {
+  background-color: rgb(var(--rule) / 0.5) !important;
 }
+
 .ant-select-dropdown .ant-select-item-option-selected .ant-select-item-option-content {
-  color: rgb(var(--ink));
+  color: rgb(var(--ink)) !important;
+  font-weight: 500;
+}
+.ant-select,
+.ant-select-focused,
+.ant-select-open
+{
+  color: rgb(var(--brass)) !important;
 }
 
 /* Composer model picker — brass label.
@@ -195,4 +274,43 @@ body {
    [data-theme] via the live variable. */
 .composer-model-select.ant-select .ant-select-selection-item {
   color: rgb(var(--brass)) !important;
+}
+
+.ant-dropdown-menu-item-divider {
+  background: rgb(var(--rule)) !important;
+}
+
+/* Ant Design Input / TextArea focus — kill the "black-then-accent" flash.
+   On focus antd swaps in `.ant-input-focused` (and the browser paints its own
+   `:focus-visible` outline) a beat before the themed border color settles,
+   which reads as a dark border flashing before the accent appears. Pin the border
+   to the accent (`--brass`, which `[data-accent]` re-points to the selected
+   accent) on focus with no color transition, and drop the outline, so the focused
+   state is the accent from the first paint. Covers both the single-line input and
+   the multi-line textarea. */
+.ant-input:focus,
+.ant-input-focused,
+textarea.ant-input:focus {
+  border-color: rgb(var(--brass)) !important;
+  box-shadow: none !important;
+  outline: none !important;
+  transition: none !important;
+}
+
+/* Chrome/Safari autofill — browsers paint their own yellow/blue background
+   (and swap the text color) on autofilled inputs, which clashes with the
+   app's themed field fill. `-webkit-box-shadow` is the only reliable way to
+   override it (background-color itself is ignored on autofilled fields); an
+   inset shadow the size of the field paints over the browser's fill with the
+   current `--ground` token, and `-webkit-text-fill-color` keeps the text on
+   theme. The huge transition delay defers the browser's own repaint (which
+   fires on a timer) long enough that ours wins first. */
+.ant-input:-webkit-autofill,
+.ant-input:-webkit-autofill:hover,
+.ant-input:-webkit-autofill:focus,
+.ant-input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px rgb(var(--ground)) inset !important;
+  -webkit-text-fill-color: rgb(var(--ink)) !important;
+  caret-color: rgb(var(--ink));
+  transition: background-color 600000s 0s, color 600000s 0s;
 }

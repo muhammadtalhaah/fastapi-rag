@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components -- provider + its hook are intentionally colocated */
 import { createContext, useCallback, useContext, useMemo } from "react";
 import { Toaster, toast } from "sonner";
-import { useThemeContext } from "./ThemeContext";
+import { useThemeContext } from "./PreferencesContext";
 
 // App-wide toast feedback, backed by Sonner. We keep the original
 // useToast() -> { showToast, dismiss } surface so call sites don't care that

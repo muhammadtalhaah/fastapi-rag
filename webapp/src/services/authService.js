@@ -1,10 +1,20 @@
 import { authApi, unwrap } from "@/api";
 
-// Map a backend user payload ({id, name, email}) to the client shape. The
-// backend never returns the password hash, so there's nothing to strip here.
+// Map a backend user payload to the client shape. The backend never returns the
+// password hash, so there's nothing to strip here. Profile fields (nickname /
+// work / instructions) ride along so the account menu + settings render them
+// without a second request.
 function toUser(raw) {
   if (!raw) return null;
-  return { id: raw.id, name: raw.name, email: raw.email, profileUrl: raw.profile_url ?? null };
+  return {
+    id: raw.id,
+    name: raw.name,
+    email: raw.email,
+    profileUrl: raw.profile_url ?? null,
+    nickname: raw.nickname ?? "",
+    work: raw.work ?? "",
+    instructions: raw.instructions ?? "",
+  };
 }
 
 // Log in with email + password. On success the backend sets the session and

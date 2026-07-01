@@ -11,7 +11,7 @@ const UploadProgress = ({ filename, progress }) => {
       <div className="flex items-center gap-3">
         <FileText size={18} aria-hidden="true" className="shrink-0 text-muted" />
         <span className="flex-1 truncate text-sm text-ink">{filename}</span>
-        <span className="font-mono text-xs text-retrieval">
+        <span className="font-mono text-xs text-primary">
           {indexing ? "indexing" : `${progress}%`}
         </span>
       </div>
@@ -24,7 +24,7 @@ const UploadProgress = ({ filename, progress }) => {
         aria-valuemax={100}
       >
         <div
-          className={`h-full bg-retrieval transition-all duration-200 ${
+          className={`h-full bg-primary transition-all duration-200 ${
             indexing ? "motion-safe:animate-pulse" : ""
           }`}
           style={{ width: `${progress}%` }}

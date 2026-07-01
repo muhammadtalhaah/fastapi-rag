@@ -7,7 +7,7 @@ const BASE_STYLES = {
   header: { display: "none" },
   body: { padding: 0 },
   mask: { background: "rgba(0, 0, 0, 0.45)" },
-  content: { contain: "layout paint" },
+  section: { contain: "layout paint" },
 };
 
 const AppDrawer = ({ open, onClose, placement = "right", size, destroyOnHidden = false, children }) => (

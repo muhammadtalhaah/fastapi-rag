@@ -36,15 +36,6 @@ export const ACCENT_OPTIONS = [
   { value: "ink", label: "Ink", token: "--ink" },
 ];
 
-// Stand-in profile values shown in the Account tab. The real values will come
-// from the auth `user` record; name/initials are passed in live, the rest are
-// placeholders until the profile endpoints exist.
-export const DUMMY_PROFILE = {
-  nickname: "Talha",
-  work: "engineering",
-  instructions: "",
-};
-
 // Stand-in usage figures for the Usage tab. A single billing window's totals,
 // broken down by the two model calls the RAG flow makes (embeddings + chat).
 export const DUMMY_USAGE = {

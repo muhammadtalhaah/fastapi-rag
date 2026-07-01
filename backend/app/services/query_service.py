@@ -46,21 +46,25 @@ BUDGET_ANSWER = 1_500
 
 SYSTEM_PROMPT = (
     "You are a helpful assistant answering questions about the user's documents. "
-    "Use the retrieved context below as your primary source, and also draw on the earlier "
-    "conversation when the user refers back to it (e.g. 'it', 'that', or follow-up questions). "
-    "If a follow-up is ambiguous, resolve it using the conversation so far rather than asking "
-    "what the user means. Only state that you don't have the information when the answer is in "
-    "neither the retrieved context nor the conversation.\n\n"
-    "Format every answer as clean, well-structured GitHub-flavored Markdown so it is easy to scan:\n"
-    "- Use Markdown headings (## for main sections, ### for sub-sections) to break a longer answer "
-    "into clearly labeled parts instead of one wall of text.\n"
-    "- Use bullet lists, numbered lists, and **bold** for key terms where they aid readability.\n"
-    "- Use Markdown tables when comparing or listing structured data.\n"
-    "- Always wrap code, commands, file paths, and config in fenced code blocks with the correct "
-    "language tag (e.g. ```python, ```bash, ```json) so it is syntax-highlighted, and use `inline code` "
-    "for short identifiers.\n"
-    "- For short, simple answers, do not over-structure — a sentence or two is fine. Add headings and "
-    "sections only when the content genuinely has multiple parts."
+    "Use the retrieved context as your primary source, and draw on the conversation history "
+    "when the user uses references like 'it', 'that', or asks follow-up questions. "
+    "Resolve ambiguous follow-ups from context rather than asking for clarification. "
+    "Only say you don't have the information when the answer is absent from both the "
+    "retrieved context and the conversation.\n\n"
+
+    "If the context partially answers the question, share what you have and note what falls "
+    "outside the available documents. Do not fabricate information.\n\n"
+
+    "Tone: direct and conversational. Avoid openers like 'Certainly!', 'Great question!', "
+    "or 'Of course!'. Get straight to the answer.\n\n"
+
+    "Formatting — use GitHub-flavored Markdown, but keep it proportional to the answer:\n"
+    "- Short or simple answers: one or two sentences, no structure needed.\n"
+    "- Longer answers with distinct parts: use ## headings and prose sections.\n"
+    "- Use bullet or numbered lists only for genuinely enumerable items, not to break up paragraphs.\n"
+    "- Bold key terms sparingly. Use tables for structured comparisons.\n"
+    "- Wrap code, commands, paths, and config in fenced code blocks with a language tag. "
+    "Use `inline code` for short identifiers."
 )
 
 try:
@@ -74,6 +78,31 @@ logger.info("[budget] system_prompt=%d tokens (budget=%d)", _SYSTEM_PROMPT_TOKEN
 
 def _count_tokens(text: str) -> int:
     return len(_enc.encode(text))
+
+
+def personalize(system_prompt: str, user: dict | None) -> str:
+    """Append a user-profile block to a system prompt when one is available.
+
+    Shared by every agent (RAG / general / web) so personalization is identical
+    no matter which route answers. ``user`` is the resolved profile dict
+    (nickname / work / instructions); guests pass None and get the base prompt
+    unchanged. Empty fields are skipped so we never inject blank lines.
+    """
+    if not user:
+        return system_prompt
+    lines: list[str] = []
+    nickname = (user.get("nickname") or "").strip()
+    work = (user.get("work") or "").strip()
+    instructions = (user.get("instructions") or "").strip()
+    if nickname:
+        lines.append(f"- The user's preferred name is {nickname}. Address them by it when natural.")
+    if work:
+        lines.append(f"- The user's field of work is {work}; tailor examples and depth accordingly.")
+    if instructions:
+        lines.append(f"- Standing instructions from the user (follow unless they conflict with a direct request): {instructions}")
+    if not lines:
+        return system_prompt
+    return system_prompt + "\n\nAbout the user you are helping:\n" + "\n".join(lines)
 
 
 def _retrieval_query(question: str, history: list[dict] | None) -> str:
@@ -253,7 +282,7 @@ def _retrieve(db: Database, query_embedding: list[float], top_k: int) -> tuple[l
     return sources, context
 
 
-def query(db: Database, question: str, top_k: int = 5, session: dict | None = None) -> dict:
+def query(db: Database, question: str, top_k: int = 5, session: dict | None = None, user: dict | None = None) -> dict:
     history = session_service.build_history(session) if session else []
     logger.info("[query] START question=%r top_k=%d history=%d", question[:80], top_k, len(history))
     t0 = time.perf_counter()
@@ -263,7 +292,7 @@ def query(db: Database, question: str, top_k: int = 5, session: dict | None = No
 
     user_message = _build_user_message(context, question)
     messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": personalize(SYSTEM_PROMPT, user)},
         *_trim_history(history),
         {"role": "user", "content": user_message},
     ]
@@ -289,7 +318,7 @@ def _sse(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
 
-async def query_stream(db: Database, question: str, top_k: int = 5, session: dict | None = None) -> AsyncIterator[str]:
+async def query_stream(db: Database, question: str, top_k: int = 5, session: dict | None = None, user: dict | None = None) -> AsyncIterator[str]:
     """Yield SSE frames with real-time status, streamed tokens, and sources."""
     history = session_service.build_history(session) if session else []
     request_id = f"{time.time():.0f}"
@@ -316,7 +345,7 @@ async def query_stream(db: Database, question: str, top_k: int = 5, session: dic
     logger.info("[stream:%s] Starting Azure OpenAI stream...", request_id)
     user_message = _build_user_message(context, question)
     messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": personalize(SYSTEM_PROMPT, user)},
         *_trim_history(history),
         {"role": "user", "content": user_message},
     ]

@@ -103,7 +103,7 @@ const ScoreBar = memo(({ score, className = "" }) => {
       aria-label={`${pct}% relevance`}
     >
       <span
-        className="absolute inset-y-0 left-0 rounded-full bg-retrieval"
+        className="absolute inset-y-0 left-0 rounded-full bg-primary"
         style={{ width: `${pct}%` }}
       />
     </span>
@@ -121,7 +121,7 @@ const ROW_CV = { contentVisibility: "auto", containIntrinsicSize: "auto 52px" };
 // Brief highlight applied to the row a citation click targeted. `scroll-mt`
 // keeps it clear of the sticky summary bar when scrolled into view.
 const FOCUS_RING =
-  "scroll-mt-4 bg-brass/5 ring-1 ring-inset ring-brass/40 transition-colors";
+  "scroll-mt-4 bg-primary/5 ring-1 ring-inset ring-primary/40 transition-colors";
 
 // Hoisted so the chunk-list ledger line doesn't allocate a fresh style object
 // on every DocRow render.
@@ -172,7 +172,7 @@ const WebSourceRow = memo(({ source, open, last, focused, rowRef, onToggle }) =>
             href={source.url}
             target="_blank"
             rel="noreferrer"
-            className="font-mono text-xs text-brass underline underline-offset-2 hover:text-brass/80"
+            className="font-mono text-xs text-primary underline underline-offset-2 hover:text-primary/80"
           >
             Open source ↗
           </a>
@@ -220,7 +220,7 @@ const DocRow = memo(({ doc, open, last, focused, rowRef, onToggle }) => {
         <FileText
           size={14}
           aria-hidden="true"
-          className="mt-0.5 shrink-0 text-muted transition-colors group-hover:text-brass"
+          className="mt-0.5 shrink-0 text-muted transition-colors group-hover:text-primary"
         />
         <span className="flex flex-1 flex-col gap-0.5 min-w-0">
           <span className="truncate text-sm font-medium text-ink leading-snug">
@@ -338,7 +338,7 @@ const ClampedText = ({ text }) => {
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="mt-1.5 font-mono text-xs text-brass underline underline-offset-2 hover:text-brass/80"
+          className="mt-1.5 font-mono text-xs text-primary underline underline-offset-2 hover:text-primary/80"
         >
           {expanded ? "Read less" : "Read more"}
         </button>
@@ -417,7 +417,7 @@ const SourcesLedger = ({ sources, focusKey, hideHeader = false }) => {
     <div className={hideHeader ? "" : "mt-4 border border-rule bg-ground/40"}>
       {!hideHeader && (
         <div className="flex items-center justify-between border-b border-rule px-4 py-2.5">
-          <span className="font-mono text-xs uppercase tracking-[0.2em] text-brass">
+          <span className="font-mono text-xs uppercase tracking-[0.2em] text-primary">
             Sources
           </span>
           <span className="font-mono text-xs text-muted">

@@ -39,15 +39,15 @@ const DropZone = ({ onFile, disabled }) => {
       aria-label="Choose a file or drop one here to upload"
       className={`flex cursor-pointer flex-col items-center justify-center gap-4 border border-dashed px-6 py-16 text-center transition-colors ${
         isDragging
-          ? "border-retrieval bg-retrieval/5"
-          : "border-rule bg-surface/30 hover:border-brass"
+          ? "border-primary bg-primary/5"
+          : "border-rule bg-surface/30 hover:border-primary"
       } ${disabled ? "pointer-events-none opacity-50" : ""}`}
     >
       <UploadCloud
         size={36}
         strokeWidth={1.5}
         aria-hidden="true"
-        className={isDragging ? "text-retrieval" : "text-muted"}
+        className={isDragging ? "text-primary" : "text-muted"}
       />
       <div>
         <p className="font-display text-lg font-medium text-ink">

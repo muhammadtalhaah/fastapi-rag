@@ -40,6 +40,7 @@ from services import rate_limit, session_service, web_search_client
 from services.query_service import (
     AZURE_DEPLOYMENT,
     azure_client,
+    personalize,
     _count_tokens,
     _retrieval_query,
     _trim_history,
@@ -162,6 +163,7 @@ async def stream(
     session: dict | None,
     request_id: str,
     client_ip: str | None = None,
+    user: dict | None = None,
 ) -> AsyncIterator[str]:
     """Answer current/external questions via web search + cited synthesis."""
     rid = request_id
@@ -214,7 +216,7 @@ async def stream(
     yield _sse("status", {"stage": "generating", "message": "Generating answer..."})
     context = _build_context(results)
     messages = [
-        {"role": "system", "content": SYNTHESIS_SYSTEM_PROMPT},
+        {"role": "system", "content": personalize(SYNTHESIS_SYSTEM_PROMPT, user)},
         *_trim_history(history),
         {"role": "user", "content": f"Web search results:\n{context}\n\nQuestion: {question}"},
     ]

@@ -1,7 +1,17 @@
 from bson import ObjectId
 from pymongo.database import Database
-from models.user import UserCreate, UserUpdate
-from services import security
+from models.user import (
+    DEFAULT_SETTINGS,
+    UserCreate,
+    UserProfileUpdate,
+    UserSettingsUpdate,
+    UserUpdate,
+)
+from services import avatar_service, security
+
+# Resolved defaults for the editable profile fields, applied over whatever is
+# (or isn't) stored so the client always gets a complete object.
+DEFAULT_PROFILE = {"nickname": "", "work": "", "instructions": ""}
 
 
 def _public(doc: dict) -> dict:
@@ -103,3 +113,105 @@ def update_user(db: Database, user_id: str, data: UserUpdate) -> dict | None:
 def delete_user(db: Database, user_id: str) -> bool:
     result = db.users.delete_one({"_id": ObjectId(user_id)})
     return result.deleted_count == 1
+
+
+def get_user_settings(db: Database, user_id: str) -> dict | None:
+    """Return the user's resolved settings, or None if the user doesn't exist.
+
+    Stored settings are merged over DEFAULT_SETTINGS so the client always gets a
+    complete object — accounts created before this feature (no `settings` field)
+    and users who've only set some keys both come back fully populated.
+    """
+    try:
+        doc = db.users.find_one({"_id": ObjectId(user_id)}, {"settings": 1})
+    except Exception:
+        # Malformed ObjectId -> treat as "not found" rather than 500.
+        return None
+    if not doc:
+        return None
+    return {**DEFAULT_SETTINGS, **(doc.get("settings") or {})}
+
+
+def update_user_settings(
+    db: Database, user_id: str, data: UserSettingsUpdate
+) -> dict | None:
+    """Merge the provided settings keys into the user's `settings` sub-document.
+
+    Only the keys the client sent (non-None) are written, each under
+    `settings.<key>` so a partial update never clobbers the other preferences.
+    Returns the full resolved settings, or None if the user doesn't exist.
+    """
+    updates = {
+        f"settings.{k}": v
+        for k, v in data.model_dump().items()
+        if v is not None
+    }
+    if updates:
+        try:
+            result = db.users.update_one(
+                {"_id": ObjectId(user_id)}, {"$set": updates}
+            )
+        except Exception:
+            return None
+        if result.matched_count == 0:
+            return None
+    return get_user_settings(db, user_id)
+
+
+# --- Profile (editable Account-settings fields) ------------------------------
+
+def _profile_from_doc(doc: dict) -> dict:
+    """Shape a raw user document into the resolved profile dict the client and
+    the chat prompt both consume. Missing fields fall back to DEFAULT_PROFILE."""
+    return {
+        "id": str(doc["_id"]),
+        "name": doc.get("name", ""),
+        "email": doc.get("email", ""),
+        "profile_url": doc.get("profile_url"),
+        "nickname": doc.get("nickname", DEFAULT_PROFILE["nickname"]),
+        "work": doc.get("work", DEFAULT_PROFILE["work"]),
+        "instructions": doc.get("instructions", DEFAULT_PROFILE["instructions"]),
+    }
+
+
+def get_user_profile(db: Database, user_id: str) -> dict | None:
+    """Return the user's resolved profile, or None if the user doesn't exist."""
+    try:
+        doc = db.users.find_one({"_id": ObjectId(user_id)})
+    except Exception:
+        return None
+    return _profile_from_doc(doc) if doc else None
+
+
+def update_user_profile(
+    db: Database, user_id: str, data: UserProfileUpdate
+) -> dict | None:
+    """Merge the provided profile keys (name/nickname/work/instructions) into the
+    user document. Only non-None keys are written, so a single-field save never
+    clobbers the others. Returns the full resolved profile, or None if missing."""
+    updates = {k: v for k, v in data.model_dump().items() if v is not None}
+    if updates:
+        try:
+            result = db.users.update_one(
+                {"_id": ObjectId(user_id)}, {"$set": updates}
+            )
+        except Exception:
+            return None
+        if result.matched_count == 0:
+            return None
+    return get_user_profile(db, user_id)
+
+
+def shuffle_avatar(db: Database, user_id: str) -> dict | None:
+    """Assign the user a fresh random avatar URL and persist it. Returns the full
+    resolved profile (with the new profile_url), or None if the user is gone."""
+    url = avatar_service.random_avatar_url()
+    try:
+        result = db.users.update_one(
+            {"_id": ObjectId(user_id)}, {"$set": {"profile_url": url}}
+        )
+    except Exception:
+        return None
+    if result.matched_count == 0:
+        return None
+    return get_user_profile(db, user_id)

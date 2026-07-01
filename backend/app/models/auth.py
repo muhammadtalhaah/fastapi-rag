@@ -30,6 +30,11 @@ class AuthUserResponse(BaseModel):
     name: str
     email: str
     profile_url: str | None = None
+    # Editable profile fields, surfaced here so the SPA has them on load (the
+    # account menu / settings panel render them without a second request).
+    nickname: str = ""
+    work: str = ""
+    instructions: str = ""
 
 
 class LoginResponse(BaseModel):

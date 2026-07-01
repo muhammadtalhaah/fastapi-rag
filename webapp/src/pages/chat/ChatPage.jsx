@@ -261,7 +261,7 @@ const ChatPage = () => {
   return (
     <div className="mx-auto flex w-full min-h-full max-w-3xl flex-1 flex-col px-4 sm_tablet:px-5">
       <div
-        className={`flex flex-1 flex-col gap-6
+        className={`flex flex-1 flex-col
         ${isEmpty && !isLoadingConversation ? "justify-center" : "justify-start pt-6 sm_tablet:pt-12"}
         `}
       >
@@ -281,7 +281,7 @@ const ChatPage = () => {
                     type="button"
                     onClick={() => send(s)}
                     disabled={isComposerDisabled}
-                    className="border border-rule px-3 py-1.5 text-xs text-muted transition-colors hover:border-brass hover:text-ink"
+                    className="border border-rule px-3 py-1.5 text-xs text-muted transition-colors hover:border-primary hover:text-ink"
                   >
                     {s}
                   </button>
@@ -310,7 +310,7 @@ const ChatPage = () => {
         <div ref={endRef} />
       </div>
 
-      <div className="sticky bottom-0 flex flex-col gap-2 bg-ground pb-2">
+      <div className="sticky bottom-0 flex flex-col gap-2 bg-ground pb-2 rounded-t-3xl">
         {!isSocketReady ? (
           <p className="text-center text-xs text-muted">
             {socketState === "CONNECTING" ? "Connecting…" : "Reconnecting…"}

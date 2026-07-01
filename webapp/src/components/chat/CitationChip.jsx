@@ -188,7 +188,7 @@ const CitationCard = ({ items, onActivate }) => {
             {body}
           </span>
         ) : null}
-        <span className="mt-2 block font-mono text-[0.6rem] uppercase tracking-wider text-brass/80">
+        <span className="mt-2 block font-mono text-[0.6rem] uppercase tracking-wider text-primary/80">
           {source && isWebSource(source) ? "Open source ↗" : "Open in sources"}
         </span>
       </button>
@@ -216,7 +216,7 @@ const CitationChip = memo(({ items, onActivate }) => {
     <button
       type="button"
       onClick={() => activate(lead, items[0].n)}
-      className="mx-0.5 inline-flex max-w-[12rem] items-center gap-1 rounded-full border border-rule bg-surface/70 py-0.5 pl-1 pr-2 align-baseline text-[0.7rem] font-medium leading-none text-muted transition-colors hover:border-brass/50 hover:text-ink"
+      className="mx-0.5 inline-flex max-w-[12rem] items-center gap-1 rounded-full border border-rule bg-surface/70 py-0.5 pl-1 pr-2 align-baseline text-[0.7rem] font-medium leading-none text-muted transition-colors hover:border-primary/50 hover:text-ink"
       aria-label={
         overflow > 0 ? `Sources: ${label} and ${overflow} more` : `Source: ${label}`
       }

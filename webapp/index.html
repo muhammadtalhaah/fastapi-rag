@@ -6,21 +6,50 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Athenæum · Retrieval Index</title>
     <script>
-      // Apply the theme before first paint to avoid a flash of the wrong theme.
-      // Mirrors the resolution logic in useTheme: saved manual choice wins,
-      // otherwise the OS preference. Kept inline + dependency-free on purpose.
+      // Apply appearance preferences before first paint to avoid a flash of the
+      // wrong theme/accent/font/direction. Mirrors the resolution logic in
+      // useTheme + usePreferences: a saved manual choice wins, otherwise the OS
+      // preference (theme only). Kept inline + dependency-free on purpose.
       (function () {
+        var root = document.documentElement;
+        var get = function (key) {
+          try {
+            return localStorage.getItem(key);
+          } catch (e) {
+            return null;
+          }
+        };
+        var oneOf = function (value, allowed, fallback) {
+          return allowed.indexOf(value) !== -1 ? value : fallback;
+        };
         try {
-          var saved = localStorage.getItem("athenaeum-theme");
+          // Theme: "system" (or missing/legacy) follows the OS; light/dark pin it.
+          var mode = get("athenaeum-theme");
           var theme =
-            saved === "dark" || saved === "light"
-              ? saved
+            mode === "dark" || mode === "light"
+              ? mode
               : window.matchMedia("(prefers-color-scheme: dark)").matches
                 ? "dark"
                 : "light";
-          document.documentElement.setAttribute("data-theme", theme);
+          root.setAttribute("data-theme", theme);
+
+          root.setAttribute(
+            "data-accent",
+            oneOf(get("athenaeum-accent"), ["brass", "retrieval", "danger", "ink"], "brass"),
+          );
+          root.setAttribute(
+            "data-font",
+            oneOf(get("athenaeum-font"), ["serif", "sans", "mono"], "serif"),
+          );
+          var lang = oneOf(
+            get("athenaeum-language"),
+            ["en", "ur", "ar", "fr", "de"],
+            "en",
+          );
+          root.setAttribute("lang", lang);
+          root.setAttribute("dir", lang === "ar" || lang === "ur" ? "rtl" : "ltr");
         } catch (e) {
-          document.documentElement.setAttribute("data-theme", "dark");
+          root.setAttribute("data-theme", "dark");
         }
       })();
     </script>

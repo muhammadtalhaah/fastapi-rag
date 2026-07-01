@@ -8,7 +8,7 @@ import { createBrowserRouter, Navigate } from "react-router-dom";
 
 // Route-level code splitting: each page is its own chunk.
 const ChatPage = lazy(() => import("@/pages/chat"));
-const ChatsPage = lazy(() => import("@/pages/chats"));
+const ChatsPage = lazy(() => import("@/pages/conversations"));
 const DocumentsPage = lazy(() => import("@/pages/documents"));
 const UploadPage = lazy(() => import("@/pages/upload"));
 

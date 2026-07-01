@@ -1,8 +1,15 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "react-router-dom";
 import { router } from "./routes";
-import { AntdThemeBridge, AuthProvider, ThemeProvider, ToastProvider, useAuth } from "@/context";
+import {
+  AntdThemeBridge,
+  AuthProvider,
+  PreferencesProvider,
+  ToastProvider,
+  useAuth,
+} from "@/context";
 import { StateBlock } from "@/components/shared";
+import { useSettingsSync } from "@/hooks";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -15,6 +22,11 @@ const queryClient = new QueryClient({
 // a fresh load or refresh. Lives inside AuthProvider so it can read auth state.
 function AuthGate() {
   const { isLoading } = useAuth();
+
+  // Pull server-stored preferences into the local (localStorage-backed) state on
+  // login, and push local changes back up. Lives here so it's inside both the
+  // auth and preferences providers it depends on.
+  useSettingsSync();
 
   if (isLoading) {
     return (
@@ -32,7 +44,7 @@ function AuthGate() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
+      <PreferencesProvider>
         <AntdThemeBridge>
           <ToastProvider>
             <AuthProvider>
@@ -40,7 +52,7 @@ function App() {
             </AuthProvider>
           </ToastProvider>
         </AntdThemeBridge>
-      </ThemeProvider>
+      </PreferencesProvider>
     </QueryClientProvider>
   );
 }

@@ -22,6 +22,7 @@ from services.query_service import (
     AZURE_DEPLOYMENT,
     BUDGET_ANSWER,
     azure_client,
+    personalize,
     summarize_overflow,
     _trim_history,
 )
@@ -29,11 +30,24 @@ from services.query_service import (
 logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = (
-    "You are a knowledgeable, helpful assistant. Answer the user's question "
-    "directly and concisely. Use the conversation history to resolve follow-ups "
-    "and pronouns. Format your answer as clean GitHub-flavored Markdown where "
-    "structure genuinely helps (code blocks, lists, bold for key terms); for "
-    "short conversational answers, plain prose is fine."
+    "You are a knowledgeable, helpful assistant for this app. You can answer "
+    "questions from the user's uploaded documents / knowledge base, handle "
+    "anything a general LLM can do (writing, coding, math, reasoning, "
+    "conversation), and search the web for current information — the app picks "
+    "the right capability automatically.\n\n"
+    "When the user asks what you can do or how you can help, reply with one "
+    "short intro sentence followed by a compact bulleted list of exactly those "
+    "three capabilities, each a single concise line:\n"
+    "- **Knowledge base** — answer questions from your uploaded documents.\n"
+    "- **General assistance** — writing, coding, math, reasoning, and everyday questions.\n"
+    "- **Web search** — look up current, real-time information.\n"
+    "Keep each bullet to one line. Do not add extra examples, sub-bullets, or "
+    "long explanations unless the user explicitly asks for them.\n\n"
+    "For everything else, answer the user's question directly and concisely. "
+    "Use the conversation history to resolve follow-ups and pronouns. Format "
+    "your answer as clean GitHub-flavored Markdown where structure genuinely "
+    "helps (code blocks, lists, bold for key terms); for short conversational "
+    "answers, plain prose is fine."
 )
 
 
@@ -49,13 +63,14 @@ async def stream(
     session: dict | None,
     request_id: str,
     client_ip: str | None = None,
+    user: dict | None = None,
 ) -> AsyncIterator[str]:
     rid = request_id
     t_total = time.perf_counter()
 
     history = session_service.build_history(session) if session else []
     messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": personalize(SYSTEM_PROMPT, user)},
         *_trim_history(history),
         {"role": "user", "content": question},
     ]
